@@ -1,0 +1,334 @@
+{
+  "id": "base",
+  "version": 1,
+  "region": "temperate-generic",
+  "placeables": [
+    {
+      "id": "glowcap",
+      "name": "Glowcap",
+      "category": "mushroom",
+      "blurb": "Teal caps that glow at night. Grows on bark or soil.",
+      "surfaces": [
+        "bark",
+        "ground"
+      ],
+      "growHours": 6,
+      "tags": [
+        "mushroom",
+        "glow"
+      ],
+      "glow": {
+        "color": "#4dffd2",
+        "minMaturity": 0.6
+      },
+      "model": {
+        "kind": "mushroom",
+        "cap": "dome",
+        "capColor": "#2c6c78",
+        "stemColor": "#e9e2cf",
+        "size": 0.2,
+        "cluster": [
+          2,
+          4
+        ],
+        "spots": "#c9fff0"
+      }
+    },
+    {
+      "id": "ember-shelf",
+      "name": "Ember shelf",
+      "category": "mushroom",
+      "blurb": "Shelf fungus that smoulders orange after dark. Bark only.",
+      "surfaces": [
+        "bark"
+      ],
+      "growHours": 10,
+      "tags": [
+        "mushroom",
+        "glow"
+      ],
+      "glow": {
+        "color": "#ffab4d",
+        "minMaturity": 0.5
+      },
+      "model": {
+        "kind": "shelf",
+        "capColor": "#a4532a",
+        "size": 0.22,
+        "cluster": [
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": "moonpuff",
+      "name": "Moonpuff",
+      "category": "mushroom",
+      "blurb": "Round white puffballs with a soft moonlight glow.",
+      "surfaces": [
+        "ground"
+      ],
+      "growHours": 4,
+      "tags": [
+        "mushroom",
+        "glow"
+      ],
+      "glow": {
+        "color": "#cfe0ff",
+        "minMaturity": 0.7
+      },
+      "model": {
+        "kind": "mushroom",
+        "cap": "puff",
+        "capColor": "#ece9e2",
+        "stemColor": "#ece9e2",
+        "size": 0.16,
+        "cluster": [
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": "daisy",
+      "name": "Daisy",
+      "category": "flower",
+      "blurb": "Seeds attract finches.",
+      "surfaces": [
+        "ground"
+      ],
+      "growHours": 12,
+      "tags": [
+        "flower",
+        "seed"
+      ],
+      "model": {
+        "kind": "flower",
+        "petals": 13,
+        "petalColor": "#ffffff",
+        "centerColor": "#f2c230",
+        "height": 0.55,
+        "headSize": 0.2
+      }
+    },
+    {
+      "id": "fire-poppy",
+      "name": "Fire poppy",
+      "category": "flower",
+      "blurb": "Nectar-rich. Hummingbirds love it.",
+      "surfaces": [
+        "ground"
+      ],
+      "growHours": 14,
+      "tags": [
+        "flower",
+        "nectar"
+      ],
+      "model": {
+        "kind": "flower",
+        "petals": 5,
+        "petalColor": "#e2473b",
+        "centerColor": "#2a1a14",
+        "height": 0.65,
+        "headSize": 0.24
+      }
+    },
+    {
+      "id": "bluebell",
+      "name": "Bluebell",
+      "category": "flower",
+      "blurb": "Nodding bells full of nectar.",
+      "surfaces": [
+        "ground"
+      ],
+      "growHours": 10,
+      "tags": [
+        "flower",
+        "nectar"
+      ],
+      "model": {
+        "kind": "bell",
+        "petalColor": "#6b7fe0",
+        "height": 0.5,
+        "headSize": 0.09,
+        "bells": 4
+      }
+    },
+    {
+      "id": "sunflower",
+      "name": "Sunflower",
+      "category": "flower",
+      "blurb": "Tall, slow, and a feast of seeds.",
+      "surfaces": [
+        "ground"
+      ],
+      "growHours": 30,
+      "tags": [
+        "flower",
+        "seed",
+        "seed"
+      ],
+      "model": {
+        "kind": "flower",
+        "petals": 20,
+        "petalColor": "#f6c21b",
+        "centerColor": "#4a2a12",
+        "height": 1.3,
+        "headSize": 0.32
+      }
+    },
+    {
+      "id": "sapling",
+      "name": "Sapling",
+      "category": "tree",
+      "blurb": "Grows into a young tree over a few days. Birds perch in it.",
+      "surfaces": [
+        "ground"
+      ],
+      "growHours": 72,
+      "tags": [
+        "tree",
+        "shrub"
+      ],
+      "model": {
+        "kind": "tree",
+        "height": 2.4
+      }
+    }
+  ],
+  "birds": [
+    {
+      "id": "robin",
+      "name": "Robin",
+      "reason": "hopping through your flowers",
+      "active": "day",
+      "attractedBy": {
+        "flower": 1
+      },
+      "minScore": 1,
+      "chancePerPoint": 0.25,
+      "maxChance": 0.8,
+      "behavior": "ground",
+      "size": 0.11,
+      "colors": {
+        "body": "#6b5a4a",
+        "breast": "#d8682e",
+        "head": "#3a332d",
+        "beak": "#e8b931",
+        "wing": "#5a4b3e"
+      }
+    },
+    {
+      "id": "goldfinch",
+      "name": "Goldfinch",
+      "reason": "after your seed heads",
+      "active": "day",
+      "attractedBy": {
+        "seed": 1
+      },
+      "minScore": 1.5,
+      "chancePerPoint": 0.25,
+      "maxChance": 0.75,
+      "flock": [
+        2,
+        4
+      ],
+      "behavior": "perch",
+      "size": 0.08,
+      "colors": {
+        "body": "#f1d02a",
+        "breast": "#f5dc4c",
+        "head": "#1d1d1d",
+        "beak": "#e7a96a",
+        "wing": "#222222"
+      }
+    },
+    {
+      "id": "hummingbird",
+      "name": "Hummingbird",
+      "reason": "sipping nectar",
+      "active": "day",
+      "attractedBy": {
+        "nectar": 1
+      },
+      "minScore": 2,
+      "chancePerPoint": 0.3,
+      "maxChance": 0.8,
+      "behavior": "hover",
+      "size": 0.05,
+      "colors": {
+        "body": "#2f8f5b",
+        "breast": "#d9e6d0",
+        "head": "#2f8f5b",
+        "beak": "#222222",
+        "wing": "#405a4a"
+      }
+    },
+    {
+      "id": "blue-jay",
+      "name": "Blue jay",
+      "reason": "checking out your trees",
+      "active": "day",
+      "attractedBy": {
+        "tree": 0.6,
+        "shrub": 1
+      },
+      "minScore": 0.5,
+      "chancePerPoint": 0.18,
+      "maxChance": 0.55,
+      "behavior": "perch",
+      "size": 0.13,
+      "colors": {
+        "body": "#3a6fd1",
+        "breast": "#e9eef5",
+        "head": "#3a6fd1",
+        "beak": "#1d1d1d",
+        "wing": "#2852a6"
+      }
+    },
+    {
+      "id": "cardinal",
+      "name": "Cardinal",
+      "reason": "drawn by seeds and shelter",
+      "active": "twilight",
+      "attractedBy": {
+        "seed": 0.7,
+        "shrub": 1
+      },
+      "minScore": 1,
+      "chancePerPoint": 0.3,
+      "maxChance": 0.7,
+      "behavior": "perch",
+      "size": 0.12,
+      "colors": {
+        "body": "#c8211f",
+        "breast": "#d6362f",
+        "head": "#c8211f",
+        "beak": "#f08a3c",
+        "wing": "#a51b1a"
+      }
+    },
+    {
+      "id": "barn-owl",
+      "name": "Barn owl",
+      "reason": "hunting moths drawn to your glowing mushrooms",
+      "active": "night",
+      "attractedBy": {
+        "glow": 1
+      },
+      "minScore": 1,
+      "chancePerPoint": 0.35,
+      "maxChance": 0.85,
+      "behavior": "perch",
+      "size": 0.2,
+      "colors": {
+        "body": "#d8b48a",
+        "breast": "#f4ece0",
+        "head": "#f1e6d6",
+        "beak": "#e3c7a6",
+        "wing": "#c49a6c"
+      }
+    }
+  ]
+}

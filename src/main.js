@@ -1,0 +1,204 @@
+// Wires everything together: data -> simulation -> 3D -> UI.
+
+import { loadContentPack } from './core/content.js';
+import { createWorld, makeTreeAnchor } from './core/model.js';
+import { simNow, withRate, jumpClock, sunPosition, birdVisits, findNextSunCrossing } from './core/sim.js';
+import { randomSeed } from './core/rng.js';
+import { LocalWorldStore } from './store/localStore.js';
+import { createScene } from './render/scene.js';
+import { GardenView } from './render/garden.js';
+import { BirdFlock } from './render/birds.js';
+import { windTime } from './render/wind.js';
+import { createHud, esc } from './ui/hud.js';
+import { setupAR } from './xr/ar.js';
+import { createCameraView } from './ui/cameraView.js';
+import { createInteraction } from './ui/interaction.js';
+
+const pack = await loadContentPack('./content/base-pack.json');
+const store = new LocalWorldStore();
+let world = await store.load();
+const isNewWorld = !world;
+if (!world) {
+  world = createWorld();
+  store.save(world);
+}
+
+let saveTimer = 0;
+function changed() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => store.save(world), 400);
+}
+
+// Graphics quality is a per-device preference, so it lives in this browser, not in the world.
+const QUALITY_KEY = 'glowgrove.quality';
+function loadQuality() {
+  try {
+    const saved = localStorage.getItem(QUALITY_KEY);
+    if (saved === 'high' || saved === 'low') return saved;
+  } catch {}
+  return (navigator.hardwareConcurrency ?? 8) <= 4 ? 'low' : 'high';
+}
+let quality = loadQuality();
+
+const { renderer, scene, camera, controls, root, ground, setEnvironment, updateAmbient, render, setQuality, arMode } = createScene(
+  document.getElementById('app'),
+  world.zone.radiusM,
+  quality
+);
+const garden = new GardenView(root, ground, pack);
+garden.sync(world);
+
+const hud = createHud(pack, {
+  onRate(rate) {
+    world.clock = withRate(world.clock, rate);
+    hud.setRate(rate);
+    changed();
+  },
+  onJump(to) {
+    const { lat, lng } = world.location;
+    const now = simNow(world.clock);
+    // Night: just after dusk. Morning: once the sun is properly up.
+    const target = to === 'night' ? findNextSunCrossing(now, lat, lng, -10, false) : findNextSunCrossing(now, lat, lng, 8, true);
+    world.clock = jumpClock(world.clock, target);
+    changed();
+  },
+  onGrowth(v) {
+    world.settings.growthSpeed = v;
+    changed();
+  },
+  onNewTree() {
+    world.anchors['tree-1'] = makeTreeAnchor(randomSeed());
+    world.entities = world.entities.filter((e) => e.anchorId !== 'tree-1');
+    garden.sync(world);
+    changed();
+    hud.toast('A new tree. Anything growing on the old one went with it.');
+  },
+  onQuality(q) {
+    quality = q;
+    setQuality(q);
+    hud.setQuality(q);
+    try {
+      localStorage.setItem(QUALITY_KEY, q);
+    } catch {}
+  },
+  onClear() {
+    world.entities = [];
+    garden.sync(world);
+    changed();
+  },
+});
+hud.setRate(world.clock.rate);
+hud.setGrowth(world.settings.growthSpeed);
+hud.setQuality(quality);
+
+const lastAnnounced = new Map();
+const flock = new BirdFlock(root, pack, (def) => {
+  const t = performance.now();
+  if (t - (lastAnnounced.get(def.id) ?? -Infinity) < 30000) return; // don't repeat the same species
+  lastAnnounced.set(def.id, t);
+  hud.toast(`<b>${esc(def.name)}</b> arrived, ${esc(def.reason)}.`);
+});
+
+// ---------------------------------------------------------------- tapping, planting, moving
+
+const interaction = createInteraction({
+  getWorld: () => world,
+  pack,
+  garden,
+  root,
+  camera,
+  controls,
+  canvas: renderer.domElement,
+  container: document.getElementById('app'),
+  hud,
+  changed,
+});
+
+const ar = setupAR({
+  renderer,
+  scene,
+  root,
+  arMode,
+  hud,
+  onSelectRay(origin, dir) {
+    interaction.tapRay(origin, dir);
+  },
+});
+
+let pendingPhoto = null;
+createCameraView({
+  hud,
+  arMode,
+  root,
+  renderer,
+  controls,
+  onPhotoRequest(capture) {
+    pendingPhoto = capture; // taken right after the next frame is drawn
+  },
+});
+
+// ---------------------------------------------------------------- loop
+
+function dayNumber(now) {
+  const startOf = (t) => {
+    const d = new Date(t);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  };
+  return Math.round((startOf(now) - startOf(world.createdAt)) / 86400e3) + 1;
+}
+
+function updateUi(now, night) {
+  const time = new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const phase = night > 0.7 ? 'night' : night > 0.1 ? 'dusk' : 'day';
+  hud.setClock(`Day ${dayNumber(now)} · ${time}`, phase);
+  let plants = 0;
+  let shrooms = 0;
+  for (const e of world.entities) {
+    if (pack.placeableById.get(e.type)?.category === 'mushroom') shrooms++;
+    else plants++;
+  }
+  hud.setStats(`${plants} plants · ${shrooms} mushrooms · ${flock.birds.size} birds`);
+}
+
+let visits = [];
+let spots = { perch: [], hover: [], ground: [] };
+let lastSlow = -1;
+let lastT = performance.now() / 1000;
+
+renderer.setAnimationLoop((_, frame) => {
+  const t = performance.now() / 1000;
+  const dt = Math.min(0.1, t - lastT);
+  lastT = t;
+  ar.update(frame);
+
+  const now = simNow(world.clock);
+  const night = setEnvironment(sunPosition(now, world.location.lat, world.location.lng));
+  garden.update(world, now, night, t);
+
+  if (t - lastSlow > 0.5) {
+    lastSlow = t;
+    visits = birdVisits(world, pack, now);
+    spots = garden.birdSpots();
+    updateUi(now, night);
+    interaction.refreshCard();
+  }
+  flock.update(visits, spots, dt, t);
+
+  if (!ar.active) controls.update();
+  windTime.value = t;
+  updateAmbient(t);
+  render();
+  if (pendingPhoto) {
+    pendingPhoto();
+    pendingPhoto = null;
+    hud.setHint('Photo saved to your downloads', false, 2500);
+  }
+});
+
+if (isNewWorld) {
+  hud.toast('Welcome to your patch. Try putting <b>Glowcaps</b> on the tree, then open Settings and skip to night.', 9000);
+}
+
+// Handy for debugging in the browser console.
+window.glowgrove = { world: () => world, pack, garden, flock, camera, controls, renderer, render };

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1a14" />
+  <title>Glowgrove</title>
+  <link rel="stylesheet" href="./src/ui/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <video id="camera-feed" playsinline muted hidden></video>
+  <div id="app"></div>
+
+  <div id="hud">
+    <header class="topbar">
+      <div class="brand">Glowgrove</div>
+      <div class="clock">
+        <span id="phase-dot" class="phase-dot"></span>
+        <span id="clock">…</span>
+      </div>
+      <div id="stats" class="stats"></div>
+    </header>
+
+    <div id="toasts" aria-live="polite"></div>
+
+    <button id="panel-toggle" class="panel-toggle" aria-expanded="false" aria-controls="panel">Settings</button>
+    <aside id="panel" class="panel" hidden>
+      <section>
+        <h2>World clock</h2>
+        <div class="seg" id="rates">
+          <button data-rate="0">Pause</button>
+          <button data-rate="1">Real</button>
+          <button data-rate="60">1 min/s</button>
+          <button data-rate="600">10 min/s</button>
+          <button data-rate="3600">1 hr/s</button>
+        </div>
+        <div class="row">
+          <button id="to-night">Skip to night</button>
+          <button id="to-morning">Skip to morning</button>
+        </div>
+      </section>
+      <section>
+        <h2>Growth speed <span id="growth-out">1×</span></h2>
+        <input id="growth" type="range" min="1" max="20" step="1" value="1" />
+      </section>
+      <section>
+        <h2>Patch</h2>
+        <div class="row">
+          <button id="new-tree">New tree</button>
+          <button id="clear">Clear patch</button>
+        </div>
+        <p class="note">"New tree" swaps in a different tree shape, to show how placement adapts.</p>
+      </section>
+      <section>
+        <h2>Graphics</h2>
+        <div class="seg" id="quality">
+          <button data-quality="high">High</button>
+          <button data-quality="low">Battery saver</button>
+        </div>
+        <p class="note">High adds glow effects, sharper shadows and denser grass.</p>
+      </section>
+      <section>
+        <h2>Camera view</h2>
+        <button id="cam-btn" class="primary">Use camera</button>
+        <div id="cam-controls" hidden>
+          <h2 class="sub">Patch size <span id="patch-scale-out">30%</span></h2>
+          <input id="patch-scale" type="range" min="5" max="100" step="1" value="30" />
+          <button id="photo-btn">Take photo</button>
+        </div>
+        <p id="cam-note" class="note">Shows your camera behind the garden, to preview the look. It doesn't track the room. Real tracking comes with AR on phones.</p>
+      </section>
+      <section>
+        <h2>AR</h2>
+        <button id="ar-btn" class="primary" hidden>View in AR</button>
+        <p id="ar-note" class="note">Checking AR support…</p>
+      </section>
+    </aside>
+
+    <div id="selection" class="selection" hidden>
+      <div class="sel-text">
+        <div id="sel-name" class="sel-name"></div>
+        <div id="sel-status" class="sel-status"></div>
+      </div>
+      <button id="sel-delete" class="danger">Delete</button>
+      <button id="sel-done">Done</button>
+    </div>
+    <div id="hint" class="hint"></div>
+    <nav id="tools" class="toolbar" aria-label="Things to place"></nav>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
