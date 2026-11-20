@@ -85,12 +85,34 @@
     </aside>
 
     <div id="selection" class="selection" hidden>
-      <div class="sel-text">
-        <div id="sel-name" class="sel-name"></div>
-        <div id="sel-status" class="sel-status"></div>
+      <div class="sel-row">
+        <div class="sel-text">
+          <div id="sel-name" class="sel-name"></div>
+          <div id="sel-status" class="sel-status"></div>
+        </div>
+        <button id="sel-delete" class="danger">Delete</button>
+        <button id="sel-done">Done</button>
       </div>
-      <button id="sel-delete" class="danger">Delete</button>
-      <button id="sel-done">Done</button>
+      <label class="sel-size">
+        <span>Size</span>
+        <input id="sel-scale" type="range" min="0" max="100" step="1" value="50" />
+        <span id="sel-scale-out" class="sel-scale-out">1×</span>
+      </label>
+    </div>
+
+    <div id="ar-chooser" class="ar-chooser" hidden>
+      <div class="ar-chooser-card">
+        <h2>How do you want to see it?</h2>
+        <button id="ar-mode-room" class="primary">
+          <b>Life-size room</b>
+          <span>Plant on your real floor, tables and walls at real size. Mark a home spot so it's all still there next time.</span>
+        </button>
+        <button id="ar-mode-table">
+          <b>Tabletop patch</b>
+          <span>Your 3D garden, shrunk onto a floor or table.</span>
+        </button>
+        <button id="ar-mode-cancel" class="link">Cancel</button>
+      </div>
     </div>
     <div class="float-actions">
       <button id="ar-move" class="float-btn" hidden>Move patch</button>

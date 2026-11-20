@@ -439,6 +439,11 @@ export function createScene(container, zoneRadius, qualityName = 'high') {
       ground.material = grassMat;
       ring.material.opacity = 0.25;
     },
+    /** Room mode has no patch: you plant straight onto the real room. */
+    setPatchVisible(visible) {
+      ground.visible = visible;
+      ring.visible = visible;
+    },
   };
 
   return { renderer, scene, camera, controls, root, ground, setEnvironment, updateAmbient, render, setQuality, arMode };

@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { maturity, glowLevel, smoothstep } from '../core/sim.js';
-import { makeTree, makeMushroomCluster, makeFlower, makePlaceholder } from './procedural.js';
+import { makeTree, makeMushroomCluster, makeFlower, makeIvy, makeMoss, makePlaceholder } from './procedural.js';
 import { getTextures } from './textures.js';
 
 // Soft contact shadows: a dark blob under each thing that sits on the ground,
@@ -18,7 +18,7 @@ function contactShadow(size) {
   m.raycast = () => {};
   return m;
 }
-const AO_SIZE = { tree: 1.6, flower: 0.3, bell: 0.25, mushroom: 0.5, shelf: 0 };
+const AO_SIZE = { tree: 1.6, flower: 0.3, bell: 0.25, mushroom: 0.5, shelf: 0, ivy: 0, moss: 0 };
 
 const easeOut = (t) => 1 - (1 - t) * (1 - t);
 
@@ -151,17 +151,23 @@ export class GardenView {
     if (kind === 'mushroom' || kind === 'shelf') built = makeMushroomCluster(def, entity.seed, entity.normal ?? [0, 1, 0]);
     else if (kind === 'flower' || kind === 'bell') built = makeFlower(def, entity.seed);
     else if (kind === 'tree') built = makeTree(entity.seed, { height: def.model.height, surface: 'young-bark' });
+    else if (kind === 'ivy') built = makeIvy(def, entity.seed, entity.normal ?? [0, 0, 1]);
+    else if (kind === 'moss') built = makeMoss(def, entity.seed, entity.normal ?? [0, 1, 0]);
     else built = makePlaceholder();
 
     const group = new THREE.Group();
     group.add(built.group);
     const aoSize = (AO_SIZE[kind] ?? 0.3) * (kind === 'flower' ? def.model.height * 2 : 1);
-    if (entity.anchorId === 'ground' && aoSize > 0) built.group.add(contactShadow(aoSize));
+    const onFloor = (entity.normal?.[1] ?? 1) > 0.7 && entity.anchorId !== 'tree-1';
+    if (onFloor && aoSize > 0) built.group.add(contactShadow(aoSize));
     group.position.fromArray(entity.position);
+    group.scale.setScalar(entity.scale ?? 1);
     group.traverse((o) => (o.userData.entityId = entity.id));
     (this.anchorGroup(entity.anchorId) ?? this.root).add(group);
 
-    return { entity, def, kind, group, ...built, inner: built.group, phase: (entity.seed % 1000) / 159 };
+    // `built.group` is the inner model (scaled by growth); `group` is the outer
+    // holder (positioned and sized by the player). Keep them distinct.
+    return { ...built, entity, def, kind, group, inner: built.group, phase: (entity.seed % 1000) / 159 };
   }
 
   update(world, now, night, timeSec) {
@@ -209,9 +215,18 @@ export class GardenView {
     });
   }
 
+  /** Change an entity's data without rebuilding its model (e.g. resizing). */
+  updateEntity(entity) {
+    const view = this.views.get(entity.id);
+    if (!view) return;
+    view.entity = entity;
+    view.group.scale.setScalar(entity.scale ?? 1);
+  }
+
   /** Raycast targets: ground, tree bark and existing entities. */
   pickTargets() {
-    const targets = [this.ground];
+    // Hidden things still get hit by rays, so leave out the ground when it's hidden (room mode).
+    const targets = this.ground.visible ? [this.ground] : [];
     for (const { tree } of this.anchorObjs.values()) if (tree) targets.push(...tree.barkMeshes, ...tree.foliage);
     for (const view of this.views.values()) targets.push(view.group);
     return targets;

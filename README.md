@@ -57,7 +57,19 @@ a *Battery saver* mode for phones.
 `vendor/three` holds Three.js r170 (MIT licence), so the game works offline
 and never depends on a CDN.
 
-## AR on a phone
+## AR on a phone: two modes
+
+- **Life-size room:** no patch. Mark a *home spot* with two taps: a corner
+  you can find again, then a point along the same edge. Plant on real floors,
+  tables, chairs and walls at real size. Everything is saved relative to the
+  home spot in a separate "room" world that runs in real time, so marking the
+  same spot next time brings the garden back, grown.
+- **Tabletop patch:** the 3D garden shrunk onto a surface.
+
+Any planted thing can be resized (0.25×–4×) from its selection card. The
+*Grand tree* grows to about 11 m (36 ft) at 1×.
+
+## AR requirements
 
 WebXR AR needs **https** and **Chrome on an ARCore Android phone**. iPhone
 Safari doesn't support it yet, so iPhone AR will come from the native app later.

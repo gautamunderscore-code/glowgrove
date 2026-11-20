@@ -84,12 +84,45 @@ export function createHud(pack, handlers) {
   let onSelectionAction = null;
   $('sel-delete').addEventListener('click', () => onSelectionAction?.('delete'));
   $('sel-done').addEventListener('click', () => onSelectionAction?.('done'));
+  // Size slider: 0..100 maps to 0.25x .. 4x on a log scale (50 = 1x).
+  const sliderToScale = (v) => Math.round(0.25 * Math.pow(16, v / 100) * 100) / 100;
+  const scaleToSlider = (k) => Math.round((Math.log(k / 0.25) / Math.log(16)) * 100);
+  const scaleInput = $('sel-scale');
+  const showScale = (k) => ($('sel-scale-out').textContent = `${k}×`);
+  scaleInput.addEventListener('input', () => {
+    const k = sliderToScale(Number(scaleInput.value));
+    showScale(k);
+    onSelectionAction?.('scale', k, false);
+  });
+  scaleInput.addEventListener('change', () => onSelectionAction?.('scale', sliderToScale(Number(scaleInput.value)), true));
+
+  // AR mode chooser.
+  const chooser = $('ar-chooser');
+  let chooserResolve = null;
+  const closeChooser = (mode) => {
+    chooser.hidden = true;
+    chooserResolve?.(mode);
+    chooserResolve = null;
+  };
+  $('ar-mode-room').addEventListener('click', () => closeChooser('room'));
+  $('ar-mode-table').addEventListener('click', () => closeChooser('tabletop'));
+  $('ar-mode-cancel').addEventListener('click', () => closeChooser(null));
 
   return {
-    showSelection(name, status) {
+    showSelection(name, status, scale = 1, sizeNote = '') {
       $('sel-name').textContent = name;
       $('sel-status').textContent = status;
+      if (document.activeElement !== scaleInput) {
+        scaleInput.value = scaleToSlider(scale);
+        showScale(scale);
+      }
+      if (sizeNote) $('sel-scale-out').textContent = `${scale}× ${sizeNote}`;
       card.hidden = false;
+    },
+    /** Opens the AR chooser; onPick runs inside the button's click, so AR can start. */
+    chooseARMode(onPick) {
+      chooserResolve = onPick;
+      chooser.hidden = false;
     },
     hideSelection() {
       card.hidden = true;
@@ -136,8 +169,10 @@ export function createHud(pack, handlers) {
 
 function swatchColor(def) {
   const m = def.model;
-  if (def.glow) return `radial-gradient(circle at 40% 35%, ${def.glow.color}, ${m.capColor})`;
+  if (def.glow && m.capColor) return `radial-gradient(circle at 40% 35%, ${def.glow.color}, ${m.capColor})`;
   if (m.kind === 'tree') return 'radial-gradient(circle at 40% 35%, #7fbf4d, #3d6b2a)';
+  if (m.kind === 'ivy') return `radial-gradient(circle at 40% 35%, #6fae4f, ${m.leafColor})`;
+  if (m.kind === 'moss') return `radial-gradient(circle at 40% 35%, ${def.glow?.color ?? '#9fe08a'}, ${m.color})`;
   return `radial-gradient(circle at 50% 50%, ${m.centerColor ?? m.petalColor} 25%, ${m.petalColor} 30%)`;
 }
 

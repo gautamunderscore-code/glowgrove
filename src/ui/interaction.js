@@ -7,7 +7,7 @@ import { createEntity } from '../core/model.js';
 import { simNow, maturity, HOUR } from '../core/sim.js';
 
 const MAX_ENTITIES = 150;
-const SURFACE_LABELS = { bark: 'tree bark', ground: 'soil' };
+const SURFACE_LABELS = { bark: 'tree bark', ground: 'soil or a flat surface', wall: 'a wall' };
 const DRAG_START_PX = 6;
 const TAP_MAX_PX = 8;
 const TAP_MAX_MS = 500;
@@ -220,19 +220,85 @@ export function createInteraction({ getWorld, pack, garden, root, camera, contro
     const now = simNow(world.clock);
     const m = maturity(entity, def, now, world.settings.growthSpeed);
     const growth = m >= 1 ? 'Fully grown' : `${Math.floor(m * 100)}% grown`;
-    hud.showSelection(def?.name ?? 'Unknown', `${growth} · planted ${formatAge(now - entity.plantedAt)}`);
+    const scale = entity.scale ?? 1;
+    let note = '';
+    if (def?.model.kind === 'tree') {
+      const m = def.model.height * scale;
+      note = `(~${Math.round(m)} m / ${Math.round(m * 3.28)} ft when grown)`;
+    }
+    hud.showSelection(def?.name ?? 'Unknown', `${growth} · planted ${formatAge(now - entity.plantedAt)}`, scale, note);
   }
 
-  hud.onSelectionAction((action) => {
+  hud.onSelectionAction((action, value, commit) => {
     if (action === 'delete' && selectedId) removeEntity(selectedId);
     if (action === 'done') select(null);
+    if (action === 'scale' && selectedId) {
+      const world = getWorld();
+      const i = world.entities.findIndex((e) => e.id === selectedId);
+      if (i < 0) return;
+      world.entities[i] = { ...world.entities[i], scale: value };
+      garden.updateEntity(world.entities[i]); // live resize, no rebuild
+      if (commit) changed();
+      refreshCard();
+    }
   });
+
+  /** Plant on a real-world surface found by AR (room mode). Position and normal are in root space. */
+  function plantReal(tool, real) {
+    const world = getWorld();
+    const def = pack.placeableById.get(tool);
+    const ny = real.normal.y;
+    const surface = ny > 0.7 ? 'ground' : Math.abs(ny) < 0.35 ? 'wall' : null;
+    if (!surface) {
+      hud.setHint("That surface is too sloped or upside down. Try a floor, table or wall", true, 3000);
+      return;
+    }
+    if (!def.surfaces.includes(surface)) {
+      hud.setHint(`${def.name} needs ${def.surfaces.map((s) => SURFACE_LABELS[s] ?? s).join(' or ')}`, true, 3000);
+      return;
+    }
+    if (world.entities.length >= MAX_ENTITIES) {
+      hud.setHint('Your garden is full. Remove something first', true, 3000);
+      return;
+    }
+    world.entities.push(
+      createEntity({
+        type: tool,
+        anchorId: 'home',
+        position: real.position.toArray().map(round3),
+        normal: real.normal.toArray().map(round3),
+        plantedAt: simNow(world.clock),
+      })
+    );
+    garden.sync(world);
+    changed();
+  }
 
   return {
     refreshCard,
-    /** For AR: a tap arrives as a ray instead of a screen position. */
-    tapRay(origin, dir) {
+    /**
+     * For AR: a tap arrives as a ray instead of a screen position. In room
+     * mode `real` is the real surface under the finger (if AR found one).
+     * Virtual things (plants, the tree) take priority over real surfaces.
+     */
+    tapRay(origin, dir, real = null) {
       raycaster.set(origin, dir);
+      const tool = hud.activeTool;
+      const virtualHit = firstHit();
+      const virtualDist = virtualHit?.distance ?? Infinity;
+      const realDist = real ? real.distanceWorld : Infinity;
+      if (real && realDist < virtualDist && tool && tool !== 'move' && tool !== 'remove') {
+        plantReal(tool, real);
+        return;
+      }
+      if (!virtualHit && !tool) {
+        hud.setHint('Pick something from the bar below first', true, 2500);
+        return;
+      }
+      if (!virtualHit && real && (tool === 'move' || tool === 'remove')) {
+        if (selectedId) select(null);
+        return;
+      }
       tap();
     },
     deselect: () => select(null),

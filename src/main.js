@@ -1,7 +1,7 @@
 // Wires everything together: data -> simulation -> 3D -> UI.
 
 import { loadContentPack } from './core/content.js';
-import { createWorld, makeTreeAnchor } from './core/model.js';
+import { createWorld, createRoomWorld, makeTreeAnchor } from './core/model.js';
 import { simNow, withRate, jumpClock, sunPosition, birdVisits, findNextSunCrossing } from './core/sim.js';
 import { randomSeed } from './core/rng.js';
 import { LocalWorldStore } from './store/localStore.js';
@@ -15,18 +15,32 @@ import { createCameraView } from './ui/cameraView.js';
 import { createInteraction } from './ui/interaction.js';
 
 const pack = await loadContentPack('./content/base-pack.json');
-const store = new LocalWorldStore();
-let world = await store.load();
-const isNewWorld = !world;
-if (!world) {
-  world = createWorld();
-  store.save(world);
-}
+// Two worlds per device: the 3D patch, and the life-size room garden used in AR room mode.
+const stores = { patch: new LocalWorldStore('glowgrove.world'), room: new LocalWorldStore('glowgrove.world.room') };
+const patchWorld = await stores.patch.load();
+const isNewWorld = !patchWorld;
+const worlds = { patch: patchWorld ?? createWorld(), room: (await stores.room.load()) ?? createRoomWorld() };
+if (isNewWorld) stores.patch.save(worlds.patch);
+let world = worlds.patch;
 
 let saveTimer = 0;
 function changed() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => store.save(world), 400);
+  const w = world;
+  saveTimer = setTimeout(() => stores[w.kind === 'room' ? 'room' : 'patch'].save(w), 400);
+}
+
+/** Show a different world (entering or leaving AR room mode). */
+function setActiveWorld(kind) {
+  const next = worlds[kind];
+  if (next === world) return;
+  clearTimeout(saveTimer);
+  stores[world.kind === 'room' ? 'room' : 'patch'].save(world);
+  world = next;
+  interaction?.deselect();
+  garden.sync(world);
+  hud.setRate(world.clock.rate);
+  hud.setGrowth(world.settings.growthSpeed);
 }
 
 // Graphics quality is a per-device preference, so it lives in this browser, not in the world.
@@ -67,6 +81,7 @@ const hud = createHud(pack, {
     changed();
   },
   onNewTree() {
+    if (!world.anchors['tree-1']) return; // room mode has no virtual tree
     world.anchors['tree-1'] = makeTreeAnchor(randomSeed());
     world.entities = world.entities.filter((e) => e.anchorId !== 'tree-1');
     garden.sync(world);
@@ -101,7 +116,7 @@ const flock = new BirdFlock(root, pack, (def) => {
 
 // ---------------------------------------------------------------- tapping, planting, moving
 
-const interaction = createInteraction({
+var interaction = createInteraction({
   getWorld: () => world,
   pack,
   garden,
@@ -121,9 +136,13 @@ const ar = setupAR({
   camera,
   arMode,
   hud,
-  onSelectRay(origin, dir) {
-    interaction.tapRay(origin, dir);
+  onSelectRay(origin, dir, real) {
+    interaction.tapRay(origin, dir, real);
   },
+  onModeChange(mode) {
+    setActiveWorld(mode === 'room' ? 'room' : 'patch');
+  },
+  hasRoomGarden: () => worlds.room.entities.length > 0,
 });
 
 let pendingPhoto = null;
@@ -202,4 +221,4 @@ if (isNewWorld) {
 }
 
 // Handy for debugging in the browser console.
-window.glowgrove = { world: () => world, pack, garden, flock, camera, controls, renderer, render };
+window.glowgrove = { world: () => world, worlds, setActiveWorld, interaction, pack, garden, flock, camera, controls, renderer, render };

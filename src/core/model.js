@@ -24,6 +24,7 @@ export function createWorld({ name = 'My patch', now = Date.now() } = {}) {
   const seed = randomSeed();
   return {
     schemaVersion: SCHEMA_VERSION,
+    kind: 'patch',
     id: randomId('world'),
     name,
     createdAt: now,
@@ -49,6 +50,37 @@ export function createWorld({ name = 'My patch', now = Date.now() } = {}) {
   };
 }
 
+/**
+ * A life-size world for AR "Room mode". Everything hangs off a single home
+ * spot that the player marks in their real room (a table corner, a door
+ * frame...). Re-marking the same spot next time brings the garden back in
+ * place. Later, a cloud anchor or a venue scan (VPS) becomes another
+ * fingerprint on this anchor and the taps go away.
+ */
+export function createRoomWorld({ name = 'My room', now = Date.now() } = {}) {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    kind: 'room',
+    id: randomId('world'),
+    name,
+    createdAt: now,
+    seed: randomSeed(),
+    location: { lat: 40, lng: longitudeFromTimezone(), source: 'timezone-estimate' },
+    zone: { shape: 'circle', radiusM: 60 },
+    settings: { growthSpeed: 1 },
+    clock: { realAnchor: now, simAnchor: now, rate: 1 }, // real time: come back in a week and it's grown
+    anchors: {
+      home: {
+        id: 'home',
+        kind: 'home-spot',
+        // 'manual-two-tap': the player taps the same corner and edge each visit.
+        fingerprints: [{ kind: 'manual-two-tap', position: [0, 0, 0] }],
+      },
+    },
+    entities: [],
+  };
+}
+
 export function makeTreeAnchor(seed) {
   return {
     id: 'tree-1',
@@ -67,6 +99,7 @@ export function createEntity({ type, anchorId, position, normal, plantedAt }) {
     normal, // [x, y, z] surface direction it grows from
     plantedAt, // world-clock time in ms
     seed: randomSeed(), // shape and colour variation
+    scale: 1, // size multiplier set by the player (life-size trees, tiny moss...)
   };
 }
 
@@ -74,6 +107,7 @@ export function createEntity({ type, anchorId, position, normal, plantedAt }) {
 export function migrateWorld(raw) {
   if (!raw || typeof raw !== 'object') return null;
   if (raw.schemaVersion === SCHEMA_VERSION) {
+    raw.kind ??= 'patch';
     raw.settings ??= { growthSpeed: 1 };
     raw.entities ??= [];
     return raw;

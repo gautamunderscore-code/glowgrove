@@ -213,7 +213,10 @@ export function makeTree(seed, opts = {}) {
 /** Hundreds of small leafy cards scattered over each canopy blob, in one draw call. */
 function makeLeafCards(spots, treeHeight, hue, rnd) {
   const tex = getTextures();
-  const perSpot = spots.map((s) => Math.round(40 + s.radius * s.radius * 220));
+  // Big trees use more, smaller-relative leaves instead of giant cards.
+  const cardSize = Math.min(0.55, treeHeight * 0.1);
+  const density = ((treeHeight * 0.1) / cardSize) ** 2;
+  const perSpot = spots.map((s) => Math.min(2200, Math.round((40 + s.radius * s.radius * 220) * Math.min(density, 6))));
   const count = perSpot.reduce((a, b) => a + b, 0);
   const material = addWind(
     new THREE.MeshStandardMaterial({ map: tex.leaf, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.7 }),
@@ -237,7 +240,7 @@ function makeLeafCards(spots, treeHeight, hue, rnd) {
       dir.set(rnd() * 2 - 1, rnd() * 2 - 0.7, rnd() * 2 - 1).normalize();
       pos.copy(spot.center).addScaledVector(dir, spot.radius * (0.45 + rnd() * 0.55));
       q.setFromEuler(new THREE.Euler(rnd() * Math.PI, rnd() * Math.PI * 2, rnd() * Math.PI));
-      scl.setScalar(treeHeight * (0.08 + rnd() * 0.06));
+      scl.setScalar(cardSize * (0.8 + rnd() * 0.6));
       mesh.setMatrixAt(i, m4.compose(pos, q, scl));
       // Outer, upper leaves catch more light.
       const light = 0.55 + 0.35 * Math.max(0, dir.y) + rnd() * 0.15;
@@ -407,6 +410,107 @@ export function makeMushroomCluster(def, seed, normal) {
 
   mergeByMaterial(group);
   return { group, glowMats, halos };
+}
+
+
+// ---------------------------------------------------------------- wall plants
+
+/** Basis vectors for a surface: n = out of the surface, down = along it, downhill. */
+function surfaceBasis(normal) {
+  const n = new THREE.Vector3(...normal).normalize();
+  const down = new THREE.Vector3(0, -1, 0).addScaledVector(n, n.y); // gravity projected onto the surface
+  if (down.lengthSq() < 1e-4) down.set(1, 0, 0).addScaledVector(n, -n.x);
+  down.normalize();
+  const side = new THREE.Vector3().crossVectors(n, down).normalize();
+  return { n, down, side };
+}
+
+/** Trailing ivy hanging from where it was planted, hugging the wall or trunk. */
+export function makeIvy(def, seed, normal) {
+  const rnd = mulberry32(seed);
+  const model = def.model;
+  const tex = getTextures();
+  const group = new THREE.Group();
+  const { n, down, side } = surfaceBasis(normal);
+  const stemMat = mat('#3d4a22', { roughness: 0.9 });
+  const leafSpots = [];
+
+  const [vMin, vMax] = model.vines ?? [3, 5];
+  const vines = vMin + Math.floor(rnd() * (vMax - vMin + 1));
+  for (let v = 0; v < vines; v++) {
+    const len = model.length * (0.5 + rnd() * 0.7);
+    const startSide = (rnd() - 0.5) * 0.25;
+    const wiggle = 0.03 + rnd() * 0.05;
+    const phase = rnd() * 6;
+    const steps = 10;
+    let prev = null;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const p = new THREE.Vector3()
+        .addScaledVector(side, startSide + Math.sin(t * 7 + phase) * wiggle + t * (rnd() - 0.5) * 0.1)
+        .addScaledVector(down, t * len)
+        .addScaledVector(n, 0.012);
+      if (prev) group.add(limb(prev, p, 0.005, 0.004, stemMat, 5));
+      // Leaves along the vine, denser near the top.
+      const leaves = i === 0 ? 3 : 2;
+      for (let k = 0; k < leaves; k++) leafSpots.push(p.clone().addScaledVector(side, (rnd() - 0.5) * 0.06));
+      prev = p;
+    }
+  }
+
+  const leafMat = addWind(new THREE.MeshStandardMaterial({ map: tex.leaf, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.6, color: model.leafColor }), 0.008, 'card');
+  const leaves = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), leafMat, leafSpots.length);
+  leaves.castShadow = true;
+  leaves.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex.leaf, alphaTest: 0.45 });
+  const m4 = new THREE.Matrix4();
+  const face = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
+  const color = new THREE.Color();
+  leafSpots.forEach((p, i) => {
+    const spin = new THREE.Quaternion().setFromAxisAngle(n, rnd() * Math.PI * 2);
+    const tilt = new THREE.Quaternion().setFromAxisAngle(side, (rnd() - 0.5) * 0.8);
+    const q = spin.multiply(tilt).multiply(face);
+    m4.compose(p.clone().addScaledVector(n, 0.01 + rnd() * 0.02), q, new THREE.Vector3().setScalar(0.07 + rnd() * 0.05));
+    leaves.setMatrixAt(i, m4);
+    leaves.setColorAt(i, color.setHSL(0.27 + (rnd() - 0.5) * 0.05, 0.4, 0.6 + rnd() * 0.25));
+  });
+  leaves.instanceMatrix.needsUpdate = true;
+  leaves.computeBoundingSphere();
+  group.add(leaves);
+  mergeByMaterial(group);
+  return { group };
+}
+
+/** A soft, glowing carpet of moss that hugs any surface. */
+export function makeMoss(def, seed, normal) {
+  const rnd = mulberry32(seed);
+  const model = def.model;
+  const group = new THREE.Group();
+  const { n, down, side } = surfaceBasis(normal);
+  const glowColor = new THREE.Color(def.glow?.color ?? '#ffffff');
+  const material = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, emissive: glowColor, emissiveIntensity: 0 });
+  const count = 90;
+  const tufts = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), material, count);
+  tufts.receiveShadow = true;
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
+  const base = new THREE.Color(model.color);
+  const color = new THREE.Color();
+  for (let i = 0; i < count; i++) {
+    const r = Math.sqrt(rnd()) * model.size * (0.6 + rnd() * 0.5);
+    const a = rnd() * Math.PI * 2;
+    const p = new THREE.Vector3().addScaledVector(side, Math.cos(a) * r).addScaledVector(down, Math.sin(a) * r * 1.2);
+    const s = model.size * (0.06 + rnd() * 0.08) * (1 - (r / model.size) * 0.5);
+    m4.compose(p, q, new THREE.Vector3(s, s * 0.45, s));
+    tufts.setMatrixAt(i, m4);
+    tufts.setColorAt(i, color.copy(base).offsetHSL((rnd() - 0.5) * 0.06, 0, (rnd() - 0.5) * 0.12));
+  }
+  tufts.instanceMatrix.needsUpdate = true;
+  tufts.computeBoundingSphere();
+  group.add(tufts);
+  const halo = makeHalo(glowColor, model.size * 3);
+  halo.position.copy(n).multiplyScalar(0.03);
+  group.add(halo);
+  return { group, glowMats: [material], halos: [halo] };
 }
 
 // ---------------------------------------------------------------- flowers
