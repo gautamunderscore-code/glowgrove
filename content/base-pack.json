@@ -265,6 +265,67 @@
         "kind": "tree",
         "height": 11
       }
+    },
+    {
+      "id": "rock",
+      "name": "Rock",
+      "category": "landscape",
+      "blurb": "Weathered stones. Resize for a pebble or a boulder.",
+      "surfaces": [
+        "ground"
+      ],
+      "growHours": 0,
+      "tags": [
+        "rock",
+        "perch"
+      ],
+      "model": {
+        "kind": "rock",
+        "size": 0.35,
+        "color": "#6e685e",
+        "cluster": [
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": "meadow-grass",
+      "name": "Grass",
+      "category": "landscape",
+      "blurb": "A clump of tall meadow grass that sways in the breeze.",
+      "surfaces": [
+        "ground"
+      ],
+      "growHours": 8,
+      "tags": [
+        "grass",
+        "seed"
+      ],
+      "model": {
+        "kind": "grass",
+        "size": 0.3,
+        "height": 0.45,
+        "blades": 120
+      }
+    },
+    {
+      "id": "pond",
+      "name": "Pond",
+      "category": "water",
+      "blurb": "A small pond with rippling water, reeds and lily pads. Kingfishers come for it.",
+      "surfaces": [
+        "ground"
+      ],
+      "growHours": 0,
+      "tags": [
+        "water"
+      ],
+      "model": {
+        "kind": "pond",
+        "radius": 0.9,
+        "waterColor": "#1f4a52"
+      }
     }
   ],
   "birds": [
@@ -398,6 +459,27 @@
         "head": "#f1e6d6",
         "beak": "#e3c7a6",
         "wing": "#c49a6c"
+      }
+    },
+    {
+      "id": "kingfisher",
+      "name": "Kingfisher",
+      "reason": "watching your pond for fish",
+      "active": "day",
+      "attractedBy": {
+        "water": 1
+      },
+      "minScore": 0.5,
+      "chancePerPoint": 0.35,
+      "maxChance": 0.75,
+      "behavior": "water",
+      "size": 0.09,
+      "colors": {
+        "body": "#1f8fd0",
+        "breast": "#e8803a",
+        "head": "#1a7fc0",
+        "beak": "#1d1d1d",
+        "wing": "#1668a8"
       }
     }
   ]

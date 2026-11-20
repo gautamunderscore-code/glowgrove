@@ -175,6 +175,9 @@ function swatchColor(def) {
   const m = def.model;
   if (def.glow && m.capColor) return `radial-gradient(circle at 40% 35%, ${def.glow.color}, ${m.capColor})`;
   if (m.kind === 'tree') return 'radial-gradient(circle at 40% 35%, #7fbf4d, #3d6b2a)';
+  if (m.kind === 'rock') return `radial-gradient(circle at 40% 35%, #c9c3b6, ${m.color})`;
+  if (m.kind === 'grass') return 'radial-gradient(circle at 40% 35%, #b8d47a, #3f6a22)';
+  if (m.kind === 'pond') return `radial-gradient(circle at 40% 35%, #8fd0e0, ${m.waterColor})`;
   if (m.kind === 'ivy') return `radial-gradient(circle at 40% 35%, #6fae4f, ${m.leafColor})`;
   if (m.kind === 'moss') return `radial-gradient(circle at 40% 35%, ${def.glow?.color ?? '#9fe08a'}, ${m.color})`;
   return `radial-gradient(circle at 50% 50%, ${m.centerColor ?? m.petalColor} 25%, ${m.petalColor} 30%)`;

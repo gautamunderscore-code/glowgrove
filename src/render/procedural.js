@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { mulberry32 } from '../core/rng.js';
 import { getTextures } from './textures.js';
 import { addWind } from './wind.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -432,7 +432,7 @@ export function makeIvy(def, seed, normal) {
   const tex = getTextures();
   const group = new THREE.Group();
   const { n, down, side } = surfaceBasis(normal);
-  const stemMat = mat('#3d4a22', { roughness: 0.9 });
+  const stemMat = mat('#5a6a34', { roughness: 0.85 });
   const leafSpots = [];
 
   const [vMin, vMax] = model.vines ?? [3, 5];
@@ -458,7 +458,7 @@ export function makeIvy(def, seed, normal) {
     }
   }
 
-  const leafMat = addWind(new THREE.MeshStandardMaterial({ map: tex.leaf, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.6, color: model.leafColor }), 0.008, 'card');
+  const leafMat = addWind(new THREE.MeshStandardMaterial({ map: tex.leaf, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.55 }), 0.008, 'card');
   const leaves = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), leafMat, leafSpots.length);
   leaves.castShadow = true;
   leaves.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex.leaf, alphaTest: 0.45 });
@@ -471,7 +471,7 @@ export function makeIvy(def, seed, normal) {
     const q = spin.multiply(tilt).multiply(face);
     m4.compose(p.clone().addScaledVector(n, 0.01 + rnd() * 0.02), q, new THREE.Vector3().setScalar(0.07 + rnd() * 0.05));
     leaves.setMatrixAt(i, m4);
-    leaves.setColorAt(i, color.setHSL(0.27 + (rnd() - 0.5) * 0.05, 0.4, 0.6 + rnd() * 0.25));
+    leaves.setColorAt(i, color.set(model.leafColor).lerp(new THREE.Color('#ffffff'), 0.55 + rnd() * 0.3).offsetHSL((rnd() - 0.5) * 0.04, 0.1, 0));
   });
   leaves.instanceMatrix.needsUpdate = true;
   leaves.computeBoundingSphere();
@@ -511,6 +511,224 @@ export function makeMoss(def, seed, normal) {
   halo.position.copy(n).multiplyScalar(0.03);
   group.add(halo);
   return { group, glowMats: [material], halos: [halo] };
+}
+
+
+// ---------------------------------------------------------------- landscape
+
+/** Weathered rocks: lumpy, flat-bottomed, darker underneath, with moss on top. */
+export function makeRock(def, seed) {
+  const rnd = mulberry32(seed);
+  const model = def.model;
+  const tex = getTextures();
+  const group = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.95,
+    normalMap: tex.bark.normalMap,
+    normalScale: new THREE.Vector2(0.6, 0.6),
+  });
+  const [cMin, cMax] = model.cluster ?? [1, 1];
+  const count = cMin + Math.floor(rnd() * (cMax - cMin + 1));
+  const base = new THREE.Color(model.color);
+  const moss = new THREE.Color('#5d7a3a');
+  for (let i = 0; i < count; i++) {
+    const size = model.size * (i === 0 ? 1 : 0.4 + rnd() * 0.4) * (0.7 + rnd() * 0.6);
+    const geo = new THREE.IcosahedronGeometry(1, 3);
+    const p = geo.attributes.position;
+    const ph = [rnd() * 6, rnd() * 6, rnd() * 6, rnd() * 6];
+    const colors = [];
+    const c = new THREE.Color();
+    const tint = base.clone().offsetHSL((rnd() - 0.5) * 0.04, 0, (rnd() - 0.5) * 0.1);
+    for (let v = 0; v < p.count; v++) {
+      const x = p.getX(v), y = p.getY(v), z = p.getZ(v);
+      const bump = 1 + 0.18 * Math.sin(x * 3 + ph[0]) * Math.sin(z * 2.5 + ph[1]) + 0.08 * Math.sin(y * 7 + ph[2]) + 0.05 * Math.sin((x + z) * 9 + ph[3]);
+      let ny = y * bump * 0.65;
+      ny = Math.max(ny, -0.25); // flat bottom so it sits on the ground
+      p.setXYZ(v, x * bump, ny, z * bump * (0.8 + 0.2 * Math.sin(ph[0])));
+      c.copy(tint).multiplyScalar(0.45 + 0.35 * (y * 0.5 + 0.5));
+      if (y > 0.45 && Math.sin(x * 5 + ph[1]) * Math.sin(z * 4 + ph[2]) > -0.2) c.lerp(moss, 0.55);
+      colors.push(c.r, c.g, c.b);
+    }
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geo.deleteAttribute('uv');
+    const smooth = mergeVertices(geo); // shared vertices -> smooth, rounded shading
+    smooth.computeVertexNormals();
+    const rock = shadowy(new THREE.Mesh(smooth, material));
+    rock.scale.setScalar(size);
+    rock.position.set((rnd() - 0.5) * model.size * 1.8 * (i ? 1 : 0), size * 0.22, (rnd() - 0.5) * model.size * 1.8 * (i ? 1 : 0));
+    rock.rotation.y = rnd() * Math.PI * 2;
+    group.add(rock);
+  }
+  mergeByMaterial(group);
+  return { group };
+}
+
+/** One curved grass blade, coloured dark at the root and light at the tip. */
+function grassBladeGeometry(width, height, bend, dark, light) {
+  const geo = new THREE.PlaneGeometry(width, height, 1, 5);
+  geo.translate(0, height / 2, 0);
+  const pos = geo.attributes.position;
+  const colors = [];
+  const c = new THREE.Color();
+  for (let v = 0; v < pos.count; v++) {
+    const t = pos.getY(v) / height;
+    pos.setX(v, pos.getX(v) * (1 - t * 0.9));
+    pos.setZ(v, t * t * bend);
+    c.copy(dark).lerp(light, t);
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** A clump of tall meadow grass. */
+export function makeGrassClump(def, seed) {
+  const rnd = mulberry32(seed);
+  const model = def.model;
+  const group = new THREE.Group();
+  const geo = grassBladeGeometry(model.height * 0.06, model.height, model.height * 0.35, new THREE.Color('#2a4a18'), new THREE.Color('#9cc062'));
+  const material = addWind(new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.8 }), 0.06, 'tip');
+  const blades = new THREE.InstancedMesh(geo, material, model.blades);
+  blades.castShadow = true;
+  blades.receiveShadow = true;
+  const m4 = new THREE.Matrix4();
+  const tint = new THREE.Color();
+  for (let i = 0; i < model.blades; i++) {
+    const r = Math.sqrt(rnd()) * model.size;
+    const a = rnd() * Math.PI * 2;
+    const h = 0.5 + rnd() * 0.7;
+    const lean = (r / model.size) * 0.5;
+    m4.compose(
+      new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.sin(a) * lean + (rnd() - 0.5) * 0.3, rnd() * Math.PI * 2, -Math.cos(a) * lean)),
+      new THREE.Vector3(1, h, 1)
+    );
+    blades.setMatrixAt(i, m4);
+    const dry = rnd();
+    blades.setColorAt(i, tint.setRGB(0.9 + dry * 0.3, 0.95 + rnd() * 0.1, 0.8 + (1 - dry) * 0.2));
+  }
+  blades.instanceMatrix.needsUpdate = true;
+  blades.computeBoundingSphere();
+  group.add(blades);
+  return { group };
+}
+
+/** A small pond: rippling water, a damp bank, pebbles, reeds and lily pads. */
+export function makePond(def, seed) {
+  const rnd = mulberry32(seed);
+  const model = def.model;
+  const tex = getTextures();
+  const group = new THREE.Group();
+  const R = model.radius;
+
+  // Irregular shoreline.
+  const pts = [];
+  const ph = [rnd() * 6, rnd() * 6, rnd() * 6];
+  const N = 48;
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const r = R * (0.85 + 0.1 * Math.sin(a * 2 + ph[0]) + 0.06 * Math.sin(a * 5 + ph[1]) + 0.03 * Math.sin(a * 9 + ph[2]));
+    pts.push(new THREE.Vector2(Math.cos(a) * r, Math.sin(a) * r));
+  }
+  const shape = new THREE.Shape(pts);
+  const flat = (geo, y) => {
+    geo.rotateX(-Math.PI / 2);
+    geo.translate(0, y, 0);
+    return geo;
+  };
+
+  const bank = new THREE.Mesh(
+    flat(new THREE.ShapeGeometry(new THREE.Shape(pts.map((p) => p.clone().multiplyScalar(1.14))), 2), 0.006),
+    new THREE.MeshStandardMaterial({ color: '#3b3020', roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 })
+  );
+  bank.receiveShadow = true;
+  group.add(bank);
+
+  const normalMap = tex.water.clone();
+  normalMap.needsUpdate = true;
+  const water = new THREE.MeshStandardMaterial({
+    color: model.waterColor,
+    roughness: 0.06,
+    metalness: 0.15,
+    normalMap,
+    normalScale: new THREE.Vector2(0.35, 0.35),
+    transparent: true,
+    opacity: 0.9,
+    envMapIntensity: 1.4,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+  });
+  const surface = new THREE.Mesh(flat(new THREE.ShapeGeometry(shape, 4), 0.014), water);
+  surface.receiveShadow = true;
+  group.add(surface);
+
+  // Pebbles around the edge.
+  const pebbleCount = Math.round(40 * R);
+  const pebbles = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ roughness: 0.9 }), pebbleCount);
+  pebbles.castShadow = pebbles.receiveShadow = true;
+  const m4 = new THREE.Matrix4();
+  const col = new THREE.Color();
+  const edge = [];
+  for (let i = 0; i < pebbleCount; i++) {
+    const p = pts[Math.floor(rnd() * N)].clone().multiplyScalar(1 + (rnd() - 0.3) * 0.12);
+    const s = 0.02 + rnd() * 0.04;
+    m4.compose(new THREE.Vector3(p.x, s * 0.4, -p.y), new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd(), rnd() * 6, rnd())), new THREE.Vector3(s, s * 0.6, s * 1.2));
+    pebbles.setMatrixAt(i, m4);
+    pebbles.setColorAt(i, col.setHSL(0.08, 0.08 + rnd() * 0.1, 0.3 + rnd() * 0.25, THREE.SRGBColorSpace));
+  }
+  pebbles.instanceMatrix.needsUpdate = true;
+  pebbles.computeBoundingSphere();
+  group.add(pebbles);
+  for (let i = 0; i < N; i += 6) edge.push(new THREE.Vector3(pts[i].x * 1.08, 0, -pts[i].y * 1.08));
+
+  // Reeds in a couple of clumps on the bank.
+  const reedGeo = grassBladeGeometry(0.018, 0.7, 0.12, new THREE.Color('#33461f'), new THREE.Color('#a7b768'));
+  const reedMat = addWind(new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.8 }), 0.05, 'tip');
+  const reedCount = 50;
+  const reeds = new THREE.InstancedMesh(reedGeo, reedMat, reedCount);
+  reeds.castShadow = true;
+  const clumps = [pts[Math.floor(rnd() * N)], pts[Math.floor(rnd() * N)]];
+  for (let i = 0; i < reedCount; i++) {
+    const c = clumps[i % 2];
+    m4.compose(
+      new THREE.Vector3(c.x * 1.02 + (rnd() - 0.5) * 0.25, 0, -c.y * 1.02 + (rnd() - 0.5) * 0.25),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler((rnd() - 0.5) * 0.3, rnd() * 6, (rnd() - 0.5) * 0.3)),
+      new THREE.Vector3(1, 0.6 + rnd() * 0.7, 1)
+    );
+    reeds.setMatrixAt(i, m4);
+  }
+  reeds.instanceMatrix.needsUpdate = true;
+  reeds.computeBoundingSphere();
+  group.add(reeds);
+
+  // Lily pads, and one flower.
+  const padMat = new THREE.MeshStandardMaterial({ color: '#3f7a2e', roughness: 0.5, side: THREE.DoubleSide });
+  const pads = 3 + Math.floor(rnd() * 4);
+  for (let i = 0; i < pads; i++) {
+    const r = 0.06 + rnd() * 0.06;
+    const pad = new THREE.Mesh(flat(new THREE.CircleGeometry(r, 20, 0.3, Math.PI * 2 - 0.3), 0.018), padMat);
+    const a = rnd() * Math.PI * 2;
+    const d = rnd() * R * 0.55;
+    pad.position.set(Math.cos(a) * d, 0, Math.sin(a) * d);
+    pad.rotation.y = rnd() * 6;
+    group.add(pad);
+    if (i === 0) {
+      const petalMat = new THREE.MeshStandardMaterial({ color: '#f6d2e2', roughness: 0.5 });
+      for (let k = 0; k < 8; k++) {
+        const petal = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), petalMat);
+        const pa = (k / 8) * Math.PI * 2;
+        petal.scale.set(0.012, 0.008, 0.03);
+        petal.position.set(pad.position.x + Math.cos(pa) * 0.025, 0.03, pad.position.z + Math.sin(pa) * 0.025);
+        petal.rotation.y = -pa + Math.PI / 2;
+        petal.rotation.x = 0.5;
+        group.add(petal);
+      }
+    }
+  }
+  mergeByMaterial(group);
+  return { group, water, edge };
 }
 
 // ---------------------------------------------------------------- flowers

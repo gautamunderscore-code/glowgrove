@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { maturity, glowLevel, smoothstep } from '../core/sim.js';
-import { makeTree, makeMushroomCluster, makeFlower, makeIvy, makeMoss, makePlaceholder } from './procedural.js';
+import { makeTree, makeMushroomCluster, makeFlower, makeIvy, makeMoss, makeRock, makeGrassClump, makePond, makePlaceholder } from './procedural.js';
 import { getTextures } from './textures.js';
 
 // Soft contact shadows: a dark blob under each thing that sits on the ground,
@@ -18,7 +18,7 @@ function contactShadow(size) {
   m.raycast = () => {};
   return m;
 }
-const AO_SIZE = { tree: 1.6, flower: 0.3, bell: 0.25, mushroom: 0.5, shelf: 0, ivy: 0, moss: 0 };
+const AO_SIZE = { tree: 1.6, flower: 0.3, bell: 0.25, mushroom: 0.5, shelf: 0, ivy: 0, moss: 0, rock: 0.9, grass: 0.6, pond: 0 };
 
 const easeOut = (t) => 1 - (1 - t) * (1 - t);
 
@@ -159,6 +159,9 @@ export class GardenView {
     else if (kind === 'tree') built = makeTree(entity.seed, { height: def.model.height, surface: 'young-bark' });
     else if (kind === 'ivy') built = makeIvy(def, entity.seed, entity.normal ?? [0, 0, 1]);
     else if (kind === 'moss') built = makeMoss(def, entity.seed, entity.normal ?? [0, 1, 0]);
+    else if (kind === 'rock') built = makeRock(def, entity.seed);
+    else if (kind === 'grass') built = makeGrassClump(def, entity.seed);
+    else if (kind === 'pond') built = makePond(def, entity.seed);
     else built = makePlaceholder();
 
     const group = new THREE.Group();
@@ -180,6 +183,10 @@ export class GardenView {
     this.selRing.material.color.set(this.dragValid ? '#5fe3b9' : '#ff6b5a');
     this.selRing.material.opacity = 0.6 + 0.3 * Math.sin(timeSec * 5);
     const glowing = [];
+    for (const view of this.views.values()) {
+      // Ripples drift slowly across ponds.
+      if (view.water) view.water.normalMap.offset.set(timeSec * 0.012, timeSec * 0.008);
+    }
     for (const view of this.views.values()) {
       const { def, kind } = view;
       if (!def) continue;
@@ -247,7 +254,7 @@ export class GardenView {
   /** Spots where birds can land, in root-local coordinates, grouped by type. */
   birdSpots() {
     const toRoot = (obj, p) => this.root.worldToLocal(obj.localToWorld(p.clone()));
-    const spots = { perch: [], hover: [], ground: [] };
+    const spots = { perch: [], hover: [], ground: [], water: [] };
     this.root.updateMatrixWorld(true);
     for (const { tree } of this.anchorObjs.values()) {
       if (tree) for (const p of tree.perches) spots.perch.push(toRoot(tree.group, p));
@@ -255,6 +262,8 @@ export class GardenView {
     for (const view of this.views.values()) {
       if (!view.def || (view.maturity ?? 0) < 0.6) continue;
       if (view.kind === 'tree') for (const p of view.perches) spots.perch.push(toRoot(view.inner, p));
+      if (view.kind === 'pond') for (const p of view.edge) spots.water.push(toRoot(view.inner, p));
+      if (view.kind === 'rock') spots.ground.push(toRoot(view.group, new THREE.Vector3(0, view.def.model.size * 0.5, 0)));
       if (view.kind === 'flower' || view.kind === 'bell') {
         const head = toRoot(view.inner, view.top);
         if (view.def.tags.includes('nectar')) spots.hover.push(head);

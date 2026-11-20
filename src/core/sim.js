@@ -33,7 +33,7 @@ export function smoothstep(a, b, x) {
 
 /** 0 = just planted, 1 = fully grown. */
 export function maturity(entity, def, now, growthSpeed = 1) {
-  if (!def) return 1;
+  if (!def || !def.growHours) return 1; // rocks, water: already 'grown'
   const age = Math.max(0, now - entity.plantedAt);
   return Math.min(1, (age * growthSpeed) / (def.growHours * HOUR));
 }

@@ -60,7 +60,12 @@ export class BirdFlock {
       const p = pick(spots.hover);
       return p ? p.add(new THREE.Vector3((rnd() - 0.5) * 0.3, 0.15 + rnd() * 0.15, (rnd() - 0.5) * 0.3)) : pick(spots.perch);
     }
-    if (def.behavior === 'ground') {
+    if (def.behavior === 'water') {
+      const p = pick(spots.water ?? []);
+      if (p) return p;
+      // No pond: behave like a ground bird.
+    }
+    if (def.behavior === 'ground' || def.behavior === 'water') {
       const p = pick(spots.ground);
       if (p) return p.add(new THREE.Vector3((rnd() - 0.5) * 0.8, 0, (rnd() - 0.5) * 0.8)).setY(0);
       return new THREE.Vector3((rnd() - 0.5) * 4, 0, (rnd() - 0.5) * 4);

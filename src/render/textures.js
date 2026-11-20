@@ -69,6 +69,7 @@ export function getTextures() {
     seeds: makeSeeds(),
     rings: makeRings(),
     ao: makeContactShadow(),
+    water: makeWaterNormal(),
   };
   return cache;
 }
@@ -236,4 +237,20 @@ function makeLeaf() {
   const t = toTexture(c);
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   return t;
+}
+
+// Water ripples: a tileable normal map that gets scrolled over time.
+function makeWaterNormal() {
+  const s = 256;
+  const n1 = makeNoise(41, 8);
+  const n2 = makeNoise(42, 32);
+  const heights = new Float32Array(s * s);
+  for (let y = 0; y < s; y++) {
+    for (let x = 0; x < s; x++) {
+      const u = x / s;
+      const v = y / s;
+      heights[y * s + x] = n1(u * 8, v * 8) * 0.6 + n2(u * 32, v * 32) * 0.4;
+    }
+  }
+  return normalMapFrom(heights, s, s, 2.5);
 }
