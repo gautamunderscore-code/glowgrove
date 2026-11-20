@@ -118,6 +118,7 @@ const ar = setupAR({
   renderer,
   scene,
   root,
+  camera,
   arMode,
   hud,
   onSelectRay(origin, dir) {

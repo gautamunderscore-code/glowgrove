@@ -42,7 +42,7 @@ export function createCameraView({ hud, arMode, root, renderer, controls, onPhot
     camControls.hidden = false;
     camBtn.textContent = 'Turn camera off';
     setScale(Number(scaleInput.value));
-    hud.setHint('Drag to tilt and turn. Right-drag or two fingers to slide the patch into place', false, 6000);
+    hud.setHint("Preview only: it won't stick to your room. Use View in AR for that", false, 6000);
   }
 
   function stop() {
@@ -52,7 +52,7 @@ export function createCameraView({ hud, arMode, root, renderer, controls, onPhot
     video.hidden = true;
     arMode.exit();
     camControls.hidden = true;
-    camBtn.textContent = 'Use camera';
+    camBtn.textContent = 'Camera preview';
     root.scale.setScalar(1);
     controls.target.y = 1.3;
   }

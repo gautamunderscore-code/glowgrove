@@ -335,6 +335,7 @@ export function createScene(container, zoneRadius, qualityName = 'high') {
   // ---------------------------------------------------------- environment per frame
 
   let passthrough = false;
+  let lastShadowScale = 1;
   const sunDir = new THREE.Vector3();
   const fogColor = new THREE.Color();
   let night = 0;
@@ -352,7 +353,19 @@ export function createScene(container, zoneRadius, qualityName = 'high') {
 
     // Sun light: never from below the horizon, warmer when low.
     const lit = Math.max(elevation, 4) * (Math.PI / 180);
-    sun.position.set(Math.sin(az) * Math.cos(lit) * 30, Math.sin(lit) * 30, -Math.cos(az) * Math.cos(lit) * 30);
+    // Shadows follow the garden. When it's shrunk to tabletop size (camera
+    // view or AR), the shadow area shrinks with it, so shadows stay crisp and
+    // the plants look grounded on the real surface.
+    const k = root.scale.x;
+    if (k !== lastShadowScale) {
+      lastShadowScale = k;
+      Object.assign(sun.shadow.camera, { left: -9 * k, right: 9 * k, top: 9 * k, bottom: -9 * k, near: 0.5 * k, far: 60 * k });
+      sun.shadow.camera.updateProjectionMatrix();
+      sun.shadow.bias = -0.0004;
+      sun.shadow.normalBias = 0.02 * k;
+    }
+    sun.target.position.copy(root.position);
+    sun.position.set(Math.sin(az) * Math.cos(lit), Math.sin(lit), -Math.cos(az) * Math.cos(lit)).multiplyScalar(30 * k).add(root.position);
     const horizon = 1 - smoothstep(0, 20, Math.abs(elevation));
     sun.intensity = 3 * smoothstep(-3, 8, elevation);
     sun.color.setHSL(0.08, 0.9 * horizon, 0.55 + 0.45 * (1 - horizon));
@@ -403,7 +416,7 @@ export function createScene(container, zoneRadius, qualityName = 'high') {
 
   // "Passthrough" = the real world shows behind the garden (camera view or AR).
   // The grass becomes invisible but still catches shadows.
-  const shadowMat = new THREE.ShadowMaterial({ opacity: 0.4 });
+  const shadowMat = new THREE.ShadowMaterial({ opacity: 0.55 });
   let passthroughUsers = 0;
   const arMode = {
     enter() {
@@ -414,7 +427,7 @@ export function createScene(container, zoneRadius, qualityName = 'high') {
       env.visible = false;
       sky.visible = false;
       ground.material = shadowMat;
-      ring.material.opacity = 0.5;
+      ring.material.opacity = 0.7;
     },
     exit() {
       passthroughUsers = Math.max(0, passthroughUsers - 1);

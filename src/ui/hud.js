@@ -127,6 +127,8 @@ export function createHud(pack, handlers) {
       setTimeout(() => el.remove(), ms);
     },
     arButton: $('ar-btn'),
+    arQuickButton: $('ar-quick'),
+    arMoveButton: $('ar-move'),
     arNote: $('ar-note'),
     overlayRoot: $('hud'),
   };

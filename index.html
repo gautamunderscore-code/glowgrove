@@ -69,13 +69,13 @@
       </section>
       <section>
         <h2>Camera view</h2>
-        <button id="cam-btn" class="primary">Use camera</button>
+        <button id="cam-btn">Camera preview</button>
         <div id="cam-controls" hidden>
           <h2 class="sub">Patch size <span id="patch-scale-out">30%</span></h2>
           <input id="patch-scale" type="range" min="5" max="100" step="1" value="30" />
           <button id="photo-btn">Take photo</button>
         </div>
-        <p id="cam-note" class="note">Shows your camera behind the garden, to preview the look. It doesn't track the room. Real tracking comes with AR on phones.</p>
+        <p id="cam-note" class="note">Shows your camera behind the garden, as a quick look only: it doesn't stick to your room. To place the garden on your real floor, use <b>View in AR</b>.</p>
       </section>
       <section>
         <h2>AR</h2>
@@ -91,6 +91,10 @@
       </div>
       <button id="sel-delete" class="danger">Delete</button>
       <button id="sel-done">Done</button>
+    </div>
+    <div class="float-actions">
+      <button id="ar-move" class="float-btn" hidden>Move patch</button>
+      <button id="ar-quick" class="float-btn primary" hidden>View in AR</button>
     </div>
     <div id="hint" class="hint"></div>
     <nav id="tools" class="toolbar" aria-label="Things to place"></nav>
