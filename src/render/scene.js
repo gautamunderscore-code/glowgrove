@@ -15,6 +15,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { XREstimatedLight } from 'three/addons/webxr/XREstimatedLight.js';
 import { mulberry32 } from '../core/rng.js';
 import { smoothstep, nightFactor } from '../core/sim.js';
 import { getTextures } from './textures.js';
@@ -69,6 +70,23 @@ export function createScene(container, zoneRadius, qualityName = 'high') {
   const moon = new THREE.DirectionalLight('#9db4ff', 0.3);
   moon.position.set(-6, 10, 4);
   scene.add(moon);
+
+  // In AR, light the garden like the real room: Chrome's light estimation
+  // reports the room's main light direction, colour and ambient light. If a
+  // phone doesn't support it (or in camera preview) a bright, neutral indoor
+  // light is used instead. Either way the game's clock still decides when
+  // things glow, but no longer darkens plants in a lit room.
+  const realLight = new XREstimatedLight(renderer, true);
+  let realLightOn = false;
+  realLight.addEventListener('estimationstart', () => {
+    realLightOn = true;
+    realLight.directionalLight.visible = false; // its direction drives our shadow-casting sun instead
+    scene.add(realLight);
+  });
+  realLight.addEventListener('estimationend', () => {
+    realLightOn = false;
+    scene.remove(realLight);
+  });
 
   // ---------------------------------------------------------- sky + sky lighting
 
@@ -302,10 +320,10 @@ export function createScene(container, zoneRadius, qualityName = 'high') {
   const FIREFLIES = 45;
   const ffGeo = new THREE.BufferGeometry();
   const ffPos = new Float32Array(FIREFLIES * 3);
-  const ffCol = new Float32Array(FIREFLIES * 3);
+  const ffCol = new Float32Array(FIREFLIES * 4); // RGBA: off fireflies are fully transparent
   const ffSeed = Array.from({ length: FIREFLIES }, () => ({ x: (rnd() - 0.5) * zoneRadius * 1.6, z: (rnd() - 0.5) * zoneRadius * 1.6, y: 0.2 + rnd() * 1.6, p: rnd() * 100, s: 0.3 + rnd() * 0.5 }));
   ffGeo.setAttribute('position', new THREE.BufferAttribute(ffPos, 3));
-  ffGeo.setAttribute('color', new THREE.BufferAttribute(ffCol, 3));
+  ffGeo.setAttribute('color', new THREE.BufferAttribute(ffCol, 4));
   const fireflies = new THREE.Points(
     ffGeo,
     new THREE.PointsMaterial({ map: getGlowSprite(), size: 0.16, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
@@ -324,9 +342,10 @@ export function createScene(container, zoneRadius, qualityName = 'high') {
       ffPos[i * 3 + 1] = f.y + Math.sin(t * f.s * 1.7 + f.p * 2) * 0.25;
       ffPos[i * 3 + 2] = f.z + Math.cos(t * f.s * 0.8 + f.p) * 0.8;
       const blink = Math.max(0, Math.sin(t * 1.3 + f.p * 3)) ** 3 * on;
-      ffCol[i * 3] = 0.85 * blink;
-      ffCol[i * 3 + 1] = 1.0 * blink;
-      ffCol[i * 3 + 2] = 0.35 * blink;
+      ffCol[i * 4] = 0.85;
+      ffCol[i * 4 + 1] = 1.0;
+      ffCol[i * 4 + 2] = 0.35;
+      ffCol[i * 4 + 3] = blink;
     }
     ffGeo.attributes.position.needsUpdate = true;
     ffGeo.attributes.color.needsUpdate = true;
@@ -340,6 +359,44 @@ export function createScene(container, zoneRadius, qualityName = 'high') {
   const fogColor = new THREE.Color();
   let night = 0;
 
+  const daySun = new THREE.Vector3(0.4, 0.8, 0.45).normalize();
+  function applyRealWorldLighting() {
+    const k = root.scale.x;
+    if (k !== lastShadowScale) {
+      lastShadowScale = k;
+      Object.assign(sun.shadow.camera, { left: -9 * k, right: 9 * k, top: 9 * k, bottom: -9 * k, near: 0.5 * k, far: 60 * k });
+      sun.shadow.camera.updateProjectionMatrix();
+      sun.shadow.normalBias = 0.02 * k;
+    }
+    const dir = new THREE.Vector3();
+    if (realLightOn) {
+      // Real room light: direction and colour from ARCore, ambient from the light probe.
+      dir.copy(realLight.directionalLight.position).normalize();
+      if (dir.y < 0.25) dir.y = 0.25; // keep shadows on the floor
+      dir.normalize();
+      sun.color.copy(realLight.directionalLight.color);
+      sun.intensity = Math.min(3, realLight.directionalLight.intensity);
+      hemi.intensity = 0.15;
+      if (!realLight.environment) refreshEnvironment(daySun, 50);
+      scene.environment = realLight.environment ?? envTarget?.texture ?? null;
+      scene.environmentIntensity = realLight.environment ? 1 : 0.5;
+    } else {
+      // No estimate: soft, bright indoor light from above.
+      dir.copy(daySun);
+      sun.color.set('#fff6ea');
+      sun.intensity = 1.6;
+      hemi.color.set('#ffffff');
+      hemi.groundColor.set('#8a7a66');
+      hemi.intensity = 0.9;
+      refreshEnvironment(daySun, 50);
+      scene.environmentIntensity = 0.6;
+    }
+    moon.intensity = 0;
+    sun.target.position.copy(root.position);
+    sun.position.copy(dir).multiplyScalar(30 * k).add(root.position);
+    renderer.toneMappingExposure = 1;
+  }
+
   function setEnvironment({ elevation, azimuth }) {
     night = nightFactor(elevation);
     const day = 1 - night;
@@ -349,6 +406,11 @@ export function createScene(container, zoneRadius, qualityName = 'high') {
 
     skyU.sunPosition.value.copy(sunDir);
     sky.visible = !passthrough && elevation > -9;
+    if (passthrough) {
+      applyRealWorldLighting();
+      stars.material.opacity = 0;
+      return night;
+    }
     refreshEnvironment(sunDir, Math.max(elevation, -6));
 
     // Sun light: never from below the horizon, warmer when low.
@@ -433,6 +495,10 @@ export function createScene(container, zoneRadius, qualityName = 'high') {
       passthroughUsers = Math.max(0, passthroughUsers - 1);
       if (passthroughUsers > 0) return;
       passthrough = false;
+      hemi.color.set('#cfe8ff');
+      hemi.groundColor.set('#4b3a26');
+      lastEnvElevation = 999; // rebuild sky lighting for the game's clock
+      scene.environment = envTarget?.texture ?? null;
       scene.background = NIGHT_SKY.clone();
       scene.fog = new THREE.FogExp2(fogColor.clone(), 0.009);
       env.visible = true;

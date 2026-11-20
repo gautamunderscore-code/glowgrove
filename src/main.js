@@ -88,6 +88,27 @@ const hud = createHud(pack, {
     changed();
     hud.toast('A new tree. Anything growing on the old one went with it.');
   },
+  onLocation() {
+    if (!navigator.geolocation) {
+      hud.setLocationNote("This browser can't share your location.");
+      return;
+    }
+    hud.setLocationNote('Finding your location…');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        // Rounded to ~10 km: enough for sun times, and nothing more precise is stored.
+        const lat = Math.round(pos.coords.latitude * 10) / 10;
+        const lng = Math.round(pos.coords.longitude * 10) / 10;
+        for (const [kind, w] of Object.entries(worlds)) {
+          w.location = { lat, lng, source: 'device-rounded' };
+          stores[kind].save(w);
+        }
+        hud.setLocationNote(`Using your area (${lat}°, ${lng}°) for sunrise and sunset.`);
+      },
+      (err) => hud.setLocationNote(err.code === 1 ? 'Location permission was blocked. Day and night stay estimated.' : `Couldn't get your location: ${err.message}`),
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 3600e3 }
+    );
+  },
   onQuality(q) {
     quality = q;
     setQuality(q);
@@ -105,6 +126,7 @@ const hud = createHud(pack, {
 hud.setRate(world.clock.rate);
 hud.setGrowth(world.settings.growthSpeed);
 hud.setQuality(quality);
+if (world.location.source?.startsWith('device')) hud.setLocationNote(`Using your area (${world.location.lat}°, ${world.location.lng}°) for sunrise and sunset.`);
 
 const lastAnnounced = new Map();
 const flock = new BirdFlock(root, pack, (def) => {

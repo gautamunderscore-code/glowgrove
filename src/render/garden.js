@@ -138,10 +138,16 @@ export class GardenView {
       }
     }
     for (const entity of world.entities) {
-      if (!this.views.has(entity.id)) this.views.set(entity.id, this.buildView(entity));
+      if (!this.views.has(entity.id)) {
+        const view = this.buildView(entity);
+        // Things planted (not loaded) pop in with a little bounce.
+        if (this.loaded) view.popStart = performance.now() / 1000;
+        this.views.set(entity.id, view);
+      }
     }
     if (this.selectedId && !this.views.has(this.selectedId)) this.selectedId = null;
     this.attachRing();
+    this.loaded = true;
   }
 
   buildView(entity) {
@@ -179,16 +185,22 @@ export class GardenView {
       if (!def) continue;
       const m = maturity(view.entity, def, now, world.settings.growthSpeed);
       view.maturity = m;
+      let pop = 1;
+      if (view.popStart !== undefined) {
+        const t = Math.min(1, (timeSec - view.popStart) / 0.6);
+        pop = t >= 1 ? 1 : 1 + 2.2 * (t - 1) ** 3 + 1.2 * (t - 1) ** 2; // ease-out with a slight overshoot
+        if (t >= 1) view.popStart = undefined;
+      }
 
       if (kind === 'tree') {
-        view.inner.scale.setScalar(0.08 + 0.92 * easeOut(m));
+        view.inner.scale.setScalar((0.15 + 0.85 * easeOut(m)) * pop);
       } else if (kind === 'flower' || kind === 'bell') {
-        view.inner.scale.setScalar(0.05 + 0.95 * easeOut(Math.min(1, m * 1.3)));
-        view.head.scale.setScalar(0.15 + 0.85 * smoothstep(0.45, 1, m));
+        view.inner.scale.setScalar((0.3 + 0.7 * easeOut(Math.min(1, m * 1.3))) * pop);
+        view.head.scale.setScalar(0.3 + 0.7 * smoothstep(0.3, 1, m));
         // Flowers close up a little at night.
         if (kind === 'flower') view.head.scale.y *= 1 - 0.4 * night;
       } else {
-        view.inner.scale.setScalar(0.05 + 0.95 * easeOut(m));
+        view.inner.scale.setScalar((0.3 + 0.7 * easeOut(m)) * pop);
       }
 
       if (view.glowMats) {

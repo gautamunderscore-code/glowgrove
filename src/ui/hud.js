@@ -64,6 +64,7 @@ export function createHud(pack, handlers) {
   for (const b of $('quality').querySelectorAll('button')) {
     b.addEventListener('click', () => handlers.onQuality?.(b.dataset.quality));
   }
+  $('use-location').addEventListener('click', () => handlers.onLocation?.());
   $('to-night').addEventListener('click', () => handlers.onJump?.('night'));
   $('to-morning').addEventListener('click', () => handlers.onJump?.('morning'));
   $('new-tree').addEventListener('click', () => handlers.onNewTree?.());
@@ -143,6 +144,9 @@ export function createHud(pack, handlers) {
     },
     setRate(rate) {
       for (const b of $('rates').querySelectorAll('button')) b.classList.toggle('active', Number(b.dataset.rate) === rate);
+    },
+    setLocationNote(text) {
+      $('location-note').textContent = text;
     },
     setQuality(q) {
       for (const b of $('quality').querySelectorAll('button')) b.classList.toggle('active', b.dataset.quality === q);

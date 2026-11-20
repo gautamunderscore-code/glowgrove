@@ -105,7 +105,7 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
     try {
       session = await navigator.xr.requestSession('immersive-ar', {
         requiredFeatures: ['hit-test'],
-        optionalFeatures: ['dom-overlay', 'anchors'],
+        optionalFeatures: ['dom-overlay', 'anchors', 'light-estimation'],
         domOverlay: { root: hud.overlayRoot },
       });
     } catch (err) {
