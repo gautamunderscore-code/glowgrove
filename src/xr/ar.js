@@ -180,7 +180,7 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
     const returning = hasRoomGarden?.();
     hud.setHint(
       returning || again
-        ? 'Your garden follows the ring. Aim it at the SAME corner as last time, then tap'
+        ? 'Aim the ring at the SAME corner as last time, then tap'
         : 'Choose a home spot you can find again, like a table corner. Aim the ring at it and tap'
     );
   }
@@ -334,8 +334,8 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
       if (!hits.length) {
         reticle.visible = false;
         stableFrames = 0;
-        if (mode === 'room') root.visible = false;
-        return;
+        return; // keep the preview steady through brief tracking gaps
+
       }
       const pose = hits[0].getPose(refSpace);
       reticle.visible = true;
@@ -344,12 +344,9 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
       reticleMat.opacity = stableFrames >= STABLE_FRAMES ? 0.95 : 0.4;
 
       const at = new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
-      // Live preview: the garden follows the ring while you pick the corner,
-      // then swings round as you aim along the edge, so you can line it up.
-      if (step === 'home-a') {
-        root.position.copy(at);
-        root.visible = true;
-      } else if (step === 'home-b' && homeA) {
+      // Live preview once the corner is set: the garden turns as you aim
+      // along the edge, so you can line it up before the second tap.
+      if (step === 'home-b' && homeA) {
         root.position.copy(homeA);
         const dx = at.x - homeA.x;
         const dz = at.z - homeA.z;
