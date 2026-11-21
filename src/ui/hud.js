@@ -74,6 +74,28 @@ export function createHud(pack, handlers) {
     if (confirm('Clear everything you planted in this patch?')) handlers.onClear?.();
   });
 
+  // Roll back or restart growth. "Start over" asks for a second tap, since
+  // pop-up confirms don't show inside AR.
+  $('growth-half').addEventListener('click', () => handlers.onRollback?.(0.5));
+  const restart = $('growth-restart');
+  let restartArmed = 0;
+  restart.addEventListener('click', () => {
+    if (restartArmed && performance.now() - restartArmed < 4000) {
+      restartArmed = 0;
+      restart.textContent = 'Start growing over';
+      handlers.onRollback?.(0);
+      return;
+    }
+    restartArmed = performance.now();
+    restart.textContent = 'Tap again to restart';
+    setTimeout(() => {
+      if (restartArmed && performance.now() - restartArmed >= 4000) {
+        restartArmed = 0;
+        restart.textContent = 'Start growing over';
+      }
+    }, 4100);
+  });
+
   const growth = $('growth');
   growth.addEventListener('input', () => {
     $('growth-out').textContent = `${growth.value}×`;

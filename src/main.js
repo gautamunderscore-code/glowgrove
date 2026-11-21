@@ -2,7 +2,7 @@
 
 import { loadContentPack } from './core/content.js';
 import { createWorld, createRoomWorld, makeTreeAnchor } from './core/model.js';
-import { simNow, withRate, jumpClock, sunPosition, birdVisits, findNextSunCrossing } from './core/sim.js';
+import { simNow, withRate, jumpClock, sunPosition, birdVisits, findNextSunCrossing, maturity, HOUR } from './core/sim.js';
 import { randomSeed } from './core/rng.js';
 import { LocalWorldStore } from './store/localStore.js';
 import { createScene } from './render/scene.js';
@@ -77,8 +77,27 @@ const hud = createHud(pack, {
     changed();
   },
   onGrowth(v) {
+    // Keep each plant's progress: shift its planting time so it is exactly as
+    // grown at the new speed as it was at the old one, then grows on from there.
+    const old = world.settings.growthSpeed || 1;
+    if (v === old) return;
+    const now = simNow(world.clock);
+    for (const e of world.entities) e.plantedAt = now - ((now - e.plantedAt) * old) / v;
     world.settings.growthSpeed = v;
     changed();
+  },
+  onRollback(keep) {
+    // keep = 0.5 halves everyone's growth; keep = 0 sends everything back to seedlings.
+    const now = simNow(world.clock);
+    const speed = world.settings.growthSpeed || 1;
+    for (const e of world.entities) {
+      const def = pack.placeableById.get(e.type);
+      if (!def?.growHours) continue; // rocks and ponds don't grow
+      const m = maturity(e, def, now, speed) * keep;
+      e.plantedAt = now - (m * def.growHours * HOUR) / speed;
+    }
+    changed();
+    hud.toast(keep ? 'Growth rolled back by half. Everything grows on from there.' : `Everything is back to seedlings, growing at ${world.settings.growthSpeed}× speed.`, 5000);
   },
   onNewTree() {
     if (!world.anchors['tree-1']) return; // room mode has no virtual tree
