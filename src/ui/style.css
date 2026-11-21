@@ -143,3 +143,8 @@ body.in-ar .brand, body.in-ar .stats { display: none; }
 .ar-chooser-card button b { font-size: 15px; }
 .ar-chooser-card button span { font-size: 12.5px; opacity: 0.85; line-height: 1.35; }
 .ar-chooser-card button.link { background: none; border: none; align-items: center; color: var(--muted); }
+
+.gardens { display: flex; flex-direction: column; gap: 6px; }
+.garden-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 9px 12px; }
+.garden-btn span { font-size: 12px; opacity: 0.8; }
+.garden-btn.active { background: var(--accent); color: var(--accent-ink); }

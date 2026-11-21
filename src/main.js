@@ -109,6 +109,21 @@ const hud = createHud(pack, {
       { enableHighAccuracy: false, timeout: 15000, maximumAge: 3600e3 }
     );
   },
+  onShowGarden(kind) {
+    if (ar?.active) return; // AR decides which garden is shown
+    setActiveWorld(kind);
+    if (kind === 'room') {
+      // The home spot is the room garden's centre.
+      controls.target.set(0, 0.6, 0);
+      camera.position.set(3.5, 2.6, 4.5);
+      hud.setHint('Preview of your room garden. The centre is your home spot', false, 4000);
+      if (!world.entities.length) hud.toast('Your room garden is empty. Start it with <b>View in AR → Life-size room</b>.', 6000);
+    } else {
+      controls.target.set(0, 1.3, 0);
+      camera.position.set(6.5, 3.6, 8.5);
+    }
+    controls.update();
+  },
   onQuality(q) {
     quality = q;
     setQuality(q);
@@ -149,9 +164,10 @@ var interaction = createInteraction({
   container: document.getElementById('app'),
   hud,
   changed,
+  isReadOnly: () => world.kind === 'room' && !ar?.active,
 });
 
-const ar = setupAR({
+var ar = setupAR({
   renderer,
   scene,
   root,
@@ -201,6 +217,7 @@ function updateUi(now, night) {
     else plants++;
   }
   hud.setStats(`${plants} plants · ${shrooms} mushrooms · ${flock.birds.size} birds`);
+  hud.setGardens({ patch: worlds.patch.entities.length, room: worlds.room.entities.length, active: world.kind === 'room' ? 'room' : 'patch' });
 }
 
 let visits = [];
@@ -237,6 +254,17 @@ renderer.setAnimationLoop((_, frame) => {
     hud.setHint('Photo saved to your downloads', false, 2500);
   }
 });
+
+// Ask the browser not to clear our saved gardens when the phone is low on space.
+navigator.storage?.persist?.().catch(() => {});
+
+if (worlds.room.entities.length) {
+  const n = worlds.room.entities.length;
+  hud.toast(
+    `Your life-size room garden has <b>${n} thing${n === 1 ? '' : 's'}</b> growing. To see ${n === 1 ? 'it' : 'them'} in your room: <b>View in AR → Life-size room</b>, then tap your home corner and edge.`,
+    10000
+  );
+}
 
 if (isNewWorld) {
   hud.toast('Welcome to your patch. Try putting <b>Glowcaps</b> on the tree, then open Settings and skip to night.', 9000);

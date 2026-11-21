@@ -19,7 +19,7 @@ export function entityIdOf(obj) {
   return null;
 }
 
-export function createInteraction({ getWorld, pack, garden, root, camera, controls, canvas, container, hud, changed }) {
+export function createInteraction({ getWorld, pack, garden, root, camera, controls, canvas, container, hud, changed, isReadOnly = () => false }) {
   const raycaster = new THREE.Raycaster();
   let selectedId = null;
   let press = null;
@@ -94,6 +94,14 @@ export function createInteraction({ getWorld, pack, garden, root, camera, contro
     const hit = firstHit();
     const entityId = hit ? entityIdOf(hit.object) : null;
 
+    // Previewing the room garden outside AR: look, select and resize, but
+    // planting and moving need the real room.
+    if (isReadOnly()) {
+      if (entityId) select(entityId === selectedId ? null : entityId);
+      else hud.setHint('This is a preview of your room garden. Plant and move things in AR → Life-size room', true, 3500);
+      return;
+    }
+
     if (tool === 'remove') {
       if (entityId) removeEntity(entityId);
       else hud.setHint('Tap something you planted to remove it', true, 2500);
@@ -150,7 +158,7 @@ export function createInteraction({ getWorld, pack, garden, root, camera, contro
       aimAt(e);
       const hit = firstHit();
       const entityId = hit ? entityIdOf(hit.object) : null;
-      const canDrag = !!entityId && hud.activeTool !== 'remove';
+      const canDrag = !!entityId && hud.activeTool !== 'remove' && !isReadOnly();
       press = { x: e.clientX, y: e.clientY, t: performance.now(), pointerId: e.pointerId, entityId: canDrag ? entityId : null, dragging: false, lastValid: null };
       if (canDrag) controls.enabled = false;
     },

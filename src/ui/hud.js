@@ -65,6 +65,8 @@ export function createHud(pack, handlers) {
     b.addEventListener('click', () => handlers.onQuality?.(b.dataset.quality));
   }
   $('use-location').addEventListener('click', () => handlers.onLocation?.());
+  $('show-patch').addEventListener('click', () => handlers.onShowGarden?.('patch'));
+  $('show-room').addEventListener('click', () => handlers.onShowGarden?.('room'));
   $('to-night').addEventListener('click', () => handlers.onJump?.('night'));
   $('to-morning').addEventListener('click', () => handlers.onJump?.('morning'));
   $('new-tree').addEventListener('click', () => handlers.onNewTree?.());
@@ -144,6 +146,13 @@ export function createHud(pack, handlers) {
     },
     setRate(rate) {
       for (const b of $('rates').querySelectorAll('button')) b.classList.toggle('active', Number(b.dataset.rate) === rate);
+    },
+    /** Counts for the two saved gardens, and which one is on screen. */
+    setGardens({ patch, room, active }) {
+      $('patch-count').textContent = `${patch} planted`;
+      $('room-count').textContent = room ? `${room} planted · open AR → Life-size room to see it in your room` : 'Empty · start one with View in AR → Life-size room';
+      $('show-patch').classList.toggle('active', active === 'patch');
+      $('show-room').classList.toggle('active', active === 'room');
     },
     setLocationNote(text) {
       $('location-note').textContent = text;
