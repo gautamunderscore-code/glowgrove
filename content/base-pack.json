@@ -14,6 +14,7 @@
         "wall"
       ],
       "growHours": 6,
+      "lifeSize": 0.45,
       "tags": [
         "mushroom",
         "glow"
@@ -45,6 +46,7 @@
         "wall"
       ],
       "growHours": 10,
+      "lifeSize": 0.5,
       "tags": [
         "mushroom",
         "glow"
@@ -72,6 +74,7 @@
         "ground"
       ],
       "growHours": 4,
+      "lifeSize": 0.5,
       "tags": [
         "mushroom",
         "glow"
@@ -102,6 +105,7 @@
         "bark"
       ],
       "growHours": 36,
+      "lifeSize": 1,
       "tags": [
         "vine",
         "shelter"
@@ -127,6 +131,7 @@
         "ground"
       ],
       "growHours": 20,
+      "lifeSize": 0.8,
       "tags": [
         "moss",
         "glow"
@@ -150,6 +155,7 @@
         "ground"
       ],
       "growHours": 12,
+      "lifeSize": 0.4,
       "tags": [
         "flower",
         "seed"
@@ -172,6 +178,7 @@
         "ground"
       ],
       "growHours": 14,
+      "lifeSize": 0.45,
       "tags": [
         "flower",
         "nectar"
@@ -194,6 +201,7 @@
         "ground"
       ],
       "growHours": 10,
+      "lifeSize": 0.55,
       "tags": [
         "flower",
         "nectar"
@@ -215,6 +223,7 @@
         "ground"
       ],
       "growHours": 30,
+      "lifeSize": 1.2,
       "tags": [
         "flower",
         "seed",
@@ -238,6 +247,7 @@
         "ground"
       ],
       "growHours": 72,
+      "lifeSize": 1,
       "tags": [
         "tree",
         "shrub"
@@ -256,6 +266,7 @@
         "ground"
       ],
       "growHours": 504,
+      "lifeSize": 1,
       "tags": [
         "tree",
         "shrub",
@@ -275,6 +286,7 @@
         "ground"
       ],
       "growHours": 0,
+      "lifeSize": 0.8,
       "tags": [
         "rock",
         "perch"
@@ -298,6 +310,7 @@
         "ground"
       ],
       "growHours": 8,
+      "lifeSize": 0.8,
       "tags": [
         "grass",
         "seed"
@@ -318,6 +331,7 @@
         "ground"
       ],
       "growHours": 0,
+      "lifeSize": 0.8,
       "tags": [
         "water"
       ],

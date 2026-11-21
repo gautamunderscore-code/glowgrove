@@ -127,6 +127,14 @@ export class GardenView {
 
   /** Add views for new entities, remove views for deleted ones. */
   sync(world) {
+    // Life-size room gardens use real-world sizes (a daisy is a hand high,
+    // not knee high). Switching garden kinds rebuilds every model.
+    const lifeSize = world.kind === 'room';
+    if (lifeSize !== this.lifeSize) {
+      for (const view of this.views.values()) view.group.parent?.remove(view.group);
+      this.views.clear();
+      this.lifeSize = lifeSize;
+    }
     const rebuiltAnchors = this.syncAnchors(world);
     const byId = new Map(world.entities.map((e) => [e.id, e]));
     for (const [id, view] of this.views) {
@@ -150,6 +158,11 @@ export class GardenView {
     this.loaded = true;
   }
 
+  /** Player's size choice times the real-world size factor in room gardens. */
+  sizeOf(entity, def) {
+    return (entity.scale ?? 1) * (this.lifeSize ? def?.lifeSize ?? 1 : 1);
+  }
+
   buildView(entity) {
     const def = this.pack.placeableById.get(entity.type);
     const kind = def?.model.kind ?? 'unknown';
@@ -170,7 +183,7 @@ export class GardenView {
     const onFloor = (entity.normal?.[1] ?? 1) > 0.7 && entity.anchorId !== 'tree-1';
     if (onFloor && aoSize > 0) built.group.add(contactShadow(aoSize));
     group.position.fromArray(entity.position);
-    group.scale.setScalar(entity.scale ?? 1);
+    group.scale.setScalar(this.sizeOf(entity, def));
     group.traverse((o) => (o.userData.entityId = entity.id));
     (this.anchorGroup(entity.anchorId) ?? this.root).add(group);
 
@@ -239,7 +252,7 @@ export class GardenView {
     const view = this.views.get(entity.id);
     if (!view) return;
     view.entity = entity;
-    view.group.scale.setScalar(entity.scale ?? 1);
+    view.group.scale.setScalar(this.sizeOf(entity, view.def));
   }
 
   /** Raycast targets: ground, tree bark and existing entities. */
