@@ -20,6 +20,8 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
   const buttons = [hud.arButton, hud.arQuickButton];
   const note = hud.arNote;
   const moveBtn = hud.arMoveButton;
+  const roomBtn = hud.arRoomButton;
+  const nudgeBox = hud.arNudge;
 
   let session = null;
   let mode = null; // 'tabletop' | 'room'
@@ -31,6 +33,8 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
   let request = null; // what to do in the next AR frame: 'place' | 'home-a' | 'home-b'
   let homeA = null;
   let lastTap = null;
+  const basePos = new THREE.Vector3(); // where the home spot is; nudgeY lifts or lowers the garden from there
+  let nudgeY = 0;
 
   const reticleMat = new THREE.MeshBasicMaterial({ color: '#5fe3b9', transparent: true, opacity: 0.9, depthTest: false });
   const makeRing = () => {
@@ -67,7 +71,23 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
       b.hidden = !visible;
       if (label) b.textContent = label;
     }
+    refreshRoomButton();
   };
+  let arSupported = false;
+  function refreshRoomButton() {
+    if (roomBtn) roomBtn.hidden = !(arSupported && !session && hasRoomGarden?.());
+  }
+  // One tap straight into the life-size room garden, no chooser.
+  roomBtn?.addEventListener('click', () => {
+    if (!session) start('room');
+  });
+  for (const b of nudgeBox?.querySelectorAll('button') ?? []) {
+    b.addEventListener('click', () => {
+      nudgeY += Number(b.dataset.dy);
+      root.position.copy(basePos).y += nudgeY;
+      hud.setHint(nudgeY === 0 ? 'Garden back at the home spot height' : `Garden ${nudgeY > 0 ? 'raised' : 'lowered'} ${Math.round(Math.abs(nudgeY) * 100)} cm`, false, 2000);
+    });
+  }
 
   if (!navigator.xr) {
     note.textContent = window.isSecureContext
@@ -76,6 +96,7 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
   } else {
     navigator.xr.isSessionSupported('immersive-ar').then((ok) => {
       if (ok) {
+        arSupported = true;
         setButtons(true);
         note.textContent = 'Life-size room: plant on your real floor, tables and walls. Tabletop: your patch, shrunk onto a surface.';
       } else {
@@ -151,13 +172,15 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
 
   function beginHomeSpot(again) {
     unplace();
+    nudgeY = 0;
+    root.quaternion.identity();
     step = 'home-a';
     homeA = null;
     homeMarker.visible = false;
     const returning = hasRoomGarden?.();
     hud.setHint(
       returning || again
-        ? 'Aim the ring at the SAME corner as last time, then tap'
+        ? 'Your garden follows the ring. Aim it at the SAME corner as last time, then tap'
         : 'Choose a home spot you can find again, like a table corner. Aim the ring at it and tap'
     );
   }
@@ -169,6 +192,7 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
     anchor = null;
     stableFrames = 0;
     if (moveBtn) moveBtn.hidden = true;
+    if (nudgeBox) nudgeBox.hidden = true;
   }
 
   function onEnd() {
@@ -189,6 +213,7 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
     onModeChange?.(null);
     setButtons(true, 'View in AR');
     if (moveBtn) moveBtn.hidden = true;
+    if (nudgeBox) nudgeBox.hidden = true;
     document.body.classList.remove('in-ar');
     hud.setHint('Back in the 3D view', false, 2500);
   }
@@ -249,8 +274,10 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
       hud.setHint('Too close to the corner. Tap a point further along the edge', true, 3000);
       return;
     }
+    basePos.copy(homeA);
     root.position.copy(homeA);
     root.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(-dz, dx));
+    if (nudgeBox) nudgeBox.hidden = false;
     root.scale.setScalar(1);
     root.visible = true;
     step = 'ready';
@@ -281,7 +308,10 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
       if (step === 'ready') {
         if (anchor && frame.trackedAnchors?.has(anchor)) {
           const pose = frame.getPose(anchor.anchorSpace, refSpace);
-          if (pose) root.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+          if (pose) {
+            basePos.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+            root.position.copy(basePos).y += nudgeY;
+          }
         }
         if (tapSource) {
           for (const input of frame.getHitTestResultsForTransientInput(tapSource)) {
@@ -304,6 +334,7 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
       if (!hits.length) {
         reticle.visible = false;
         stableFrames = 0;
+        if (mode === 'room') root.visible = false;
         return;
       }
       const pose = hits[0].getPose(refSpace);
@@ -313,6 +344,18 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
       reticleMat.opacity = stableFrames >= STABLE_FRAMES ? 0.95 : 0.4;
 
       const at = new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
+      // Live preview: the garden follows the ring while you pick the corner,
+      // then swings round as you aim along the edge, so you can line it up.
+      if (step === 'home-a') {
+        root.position.copy(at);
+        root.visible = true;
+      } else if (step === 'home-b' && homeA) {
+        root.position.copy(homeA);
+        const dx = at.x - homeA.x;
+        const dz = at.z - homeA.z;
+        if (Math.hypot(dx, dz) >= MIN_EDGE) root.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(-dz, dx));
+        root.visible = true;
+      }
       if (request === 'place') {
         request = null;
         finishTabletop();
@@ -324,7 +367,7 @@ export function setupAR({ renderer, scene, root, camera, arMode, hud, onSelectRa
         homeMarker.visible = true;
         step = 'home-b';
         pinWith(hits[0]);
-        hud.setHint('Now aim along the same edge, 30 cm or more away, and tap. This sets the direction');
+        hud.setHint('Now aim along the same edge. The garden turns with the ring. Tap when it lines up');
       } else if (request === 'home-b') {
         request = null;
         finishRoom(at);

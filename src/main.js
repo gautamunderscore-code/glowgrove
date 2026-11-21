@@ -261,7 +261,7 @@ navigator.storage?.persist?.().catch(() => {});
 if (worlds.room.entities.length) {
   const n = worlds.room.entities.length;
   hud.toast(
-    `Your life-size room garden has <b>${n} thing${n === 1 ? '' : 's'}</b> growing. To see ${n === 1 ? 'it' : 'them'} in your room: <b>View in AR → Life-size room</b>, then tap your home corner and edge.`,
+    `Your life-size room garden has <b>${n} thing${n === 1 ? '' : 's'}</b> growing. Tap <b>My room garden in AR</b>, then tap your home corner and edge.`,
     10000
   );
 }

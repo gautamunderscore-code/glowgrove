@@ -175,6 +175,8 @@ export function createHud(pack, handlers) {
     arButton: $('ar-btn'),
     arQuickButton: $('ar-quick'),
     arMoveButton: $('ar-move'),
+    arRoomButton: $('ar-room'),
+    arNudge: $('ar-nudge'),
     arNote: $('ar-note'),
     overlayRoot: $('hud'),
   };
