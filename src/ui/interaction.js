@@ -293,10 +293,23 @@ export function createInteraction({ getWorld, pack, garden, root, camera, contro
       raycaster.set(origin, dir);
       const tool = hud.activeTool;
       const virtualHit = firstHit();
-      const virtualDist = virtualHit?.distance ?? Infinity;
       const realDist = real ? real.distanceWorld : Infinity;
-      if (real && realDist < virtualDist && tool && tool !== 'move' && tool !== 'remove') {
-        plantReal(tool, real);
+      const planting = tool && tool !== 'move' && tool !== 'remove';
+      if (real && planting) {
+        // With something to plant, a tap on a real surface plants there.
+        // Leaves never get in the way (you can plant under a big tree); only
+        // a solid thing clearly in front of the surface is selected instead.
+        const solid = raycaster
+          .intersectObjects(garden.pickTargets(), true)
+          .find((h) => h.object.userData.surface !== 'foliage');
+        const inFront = solid && solid.distance < realDist - 0.15;
+        if (!inFront) {
+          plantReal(tool, real);
+          return;
+        }
+      }
+      if (!virtualHit && planting && !real) {
+        hud.setHint("Couldn't find a surface there. Move the phone slowly so it sees the floor or wall, then tap again", true, 3500);
         return;
       }
       if (!virtualHit && !tool) {
